@@ -1,0 +1,552 @@
+---
+title:  "TMB 101"
+subtitle: "FIMS Implementation Team Workshop"
+author: "Andrea Havron<br>NOAA Fisheries, OST<br> 2022-03-23"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: ["xaringan-themer.css", "slides-style.css"]
+    lib_dir: libs
+    nature:
+      ratio: '4:3'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc( (%current% - 1) / (%total% - 1) * 100%);">
+          </div>
+        </div>`
+---
+layout: true
+
+.footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
+
+
+<style type="text/css">
+
+code.cpp{
+  font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-tile-view, echo=FALSE}
+# this gives you a tile navigation if you type "O" at any time
+xaringanExtra::use_tile_view()
+```
+
+
+---
+# What is TMB?
+<br><br>
+
+* TMB is an R package and environment for fitting statistical models
+* Models are written in C++ and run from R
+* TMB can implement:
+  * Maximum Likelihood Inference
+  * Random Effects Modeling
+  * Bayesian Hierarchical Modeling
+* TMB performs automatic differentiation
+  * Calculates accurate higher-order derivatives
+  * Gradients (derivative vectors) are used for faster optimization
+
+---
+# ML Inference
+
+What is the likelihood for 30 successes in 100 trials?
+
+.pull-left[
+1. Specify the model <br><br>
+$y ~ \sim Binomial(n, p)$
+]
+---
+# ML Inference
+
+What is the likelihood for 30 successes in 100 trials?
+
+.pull-left[
+1. Specify the model
+2. Calculate the likelihood<br><br>
+$L(p; n, y) = \frac{n!}{y!(n-y)!}p^y(1-p)^{n-y}$
+]
+
+.pull-right[
+$L(p; n = 100, y = 30)$
+```{r, eval=TRUE, echo = FALSE}
+curve(dbinom(30,100,x),0,0.75, ylab = 'L(p)', xlab = 'p')
+```
+]
+---
+
+# ML Inference
+
+What is the likelihood for 30 successes in 100 trials?
+
+.pull-left[
+1. Specify the model
+2. Calculate the likelihood
+3. Calculate the negative log-likelihood<br><br>
+$-\ell(p; n, y) = -[ln\big(\frac{n!}{y!(n-y)!}\big) + yln(p)$<br>
+     $$+ (n-y)ln(1-p)]$$
+]
+
+.pull-right[
+$-ln\big[L(p; n = 100, y = 30)\big]$
+```{r, eval=TRUE, echo = FALSE}
+curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
+```
+]
+---
+
+# ML Inference
+
+What is the likelihood for 30 successes in 100 trials?
+
+.pull-left[
+1. Specify the model
+2. Calculate the likelihood
+3. Calculate the negative log-likelihood
+$-\ell(p; n, y) = -[ln\big(\frac{n!}{y!(n-y)!}\big) + yln(p)$<br>
+     $$+ (n-y)ln(1-p)]$$
+4. Calculate the derivative w.r.t. $p$<br><br>
+$\frac{d(-\ell(p; n, y))}{dp} = -\frac{y}{p}- \frac{n-y}{1-p}$
+]
+
+.pull-right[
+$-ln\big[L(p; n = 100, y = 30)\big]$
+```{r, eval=TRUE, echo = FALSE}
+curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
+```
+]
+---
+
+# ML Inference
+
+What is the likelihood for 30 successes in 100 trials?
+
+.pull-left[
+1. Specify the model
+2. Calculate the likelihood
+3. Calculate the negative log-likelihood
+4. Calculate the derivate wrt p
+5. Set to 0 and solve for MLE<br><br>
+for n = 100 and y = 30, 
+\begin{align}
+0 &= -\frac{y}{p}- \frac{n-y}{1-p}\\
+\hat{p} &= \frac{y}{n} \\
+\hat{p} &= \frac{30}{100} = 0.3
+\end{align}
+]
+
+.pull-right[
+$-ln\big[L(p; N = 100, y = 30)\big]$
+```{r, eval=TRUE, echo = FALSE}
+curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
+nll <- -dbinom(30,100,.3,TRUE)
+segments(0.1, nll, 0.5, nll, col='red', lwd=2)
+```
+]
+---
+
+# ML with TMB:
+<br><br>
+1. Write C++ model to specify the negative log-likelihood for a set of parameters and data
+2. Compile the model and link to R
+3. Construct the C++ objective function with derivatives
+3. Pass the following to a R minimizer:
+ * objective function: specified by user in C++
+ * initial parameters: specified by user in R
+ * gradient functions: calculated by TMB based on objective function
+4. At each step of minimization:
+ * Parameter values are updated
+ * The negative log-likelihood is calculated
+ * The gradient functions return the gradients (vector of derivatives) based on the new parameter values
+5. Model convergence is reached when:
+ * The gradients are near zero
+ * The negative log-likelihood is at a minimum
+
+---
+
+# TMB Model
+
+
+.pull-left[
+linreg.cpp
+
+```cpp
+// Simple linear regression
+#include <TMB.hpp>
+template <class Type>
+  
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(y);
+  DATA_MATRIX(X);
+  PARAMETER_VECTOR(beta);
+  PARAMETER(lnSigma);
+  
+  Type nll = 0;
+  Type sigma = exp(lnSigma);
+  int n = y.size();
+  vector<Type> mu = X * beta;
+  for(int i=0; i<n; i++){
+    nll -= dnorm(y(i), mu(i), sigma, true);
+  }
+  
+  Type sig2 = pow(sigma,2);
+  REPORT(sig2);
+  ADREPORT(sig2);
+  
+  return nll;
+}
+```
+]
+
+.pull-right[
+**C++ preliminaries**
+* Lines end in semi-colons
+* Everything must be declared
+* Type is generic and assigned based on input
+* Indexing starts at 0!
+* x -= 1: x = x-1
+* Math operators similar to R (+,-,/,*) 
+* Use pow(x,p) for x^p
+* if statements cannot be based on a parameter
+]
+
+
+
+---
+# Data: Importing data from R<br><br>
+* Pass data to TMB with these 'macros'
+* Note: do not specify the object dimension
+<br><br>
+```{r echo = FALSE, results = 'asis'}
+library(knitr)
+df <- as.data.frame(
+  rbind(
+    c('DATA_VECTOR(x)',	'vector<Type>',	'vector'),
+    c('DATA_MATRIX(x)','	matrix<Type>',	'matrix'),
+    c('DATA_SCALAR(x)',	'Type',	'numeric(1)'),
+    c('DATA_INTEGER(x)',	'int',	'integer(1)'),
+    c('DATA_FACTOR(x)',	'vector<int>',	'factor'),
+    c('DATA_ARRAY(x)'	,'array<Type>',	'array')
+  )
+)
+colnames(df) <- c('TMB Syntax' , 'C++ Type' , 'R Type')
+kable(df)
+```
+---
+# Data: Importing data from R<br><br>
+
+.pull-left-narrow[
+TMB code
+```cpp
+DATA_VECTOR(y); 
+DATA_MATRIX(X); 
+DATA_INTEGER(i); 
+DATA_FACTOR(ngroup1); 
+DATA_FACTOR(ngroup2); 
+
+```
+]
+
+.pull-right-wide[
+R script
+```{r}
+Data <- list(
+  y = c(30.2, 45.3, 12.1),
+  X = matrix(0,3,3),
+  i = 11,
+  ngroup1 = c(1,1,2,2,2),
+  #ngroup can also be a string vector
+  ngroup2 = c('A', 'A', 'B', 'B', 'B')
+)
+str(Data)
+```
+]
+
+
+
+---
+# Declaring model parameters<br><br>
+* No integer parameters allowed
+* Again, do not specify the object dimension
+<br><br>
+```{r echo = FALSE, results = 'asis'}
+library(knitr)
+df <- as.data.frame(
+  rbind(
+    c('PARAMETER_VECTOR(x)',	'vector<Type>',	'vector'),
+    c('PARAMETER_MATRIX(x)','	matrix<Type>',	'matrix'),
+    c('PARAMETER_ARRAY(x)'	,'array<Type>',	'array'),
+    c('PARAMETER(x)'	,'Type',	'numeric(1)')
+  )
+)
+colnames(df) <- c('TMB Syntax' , 'C++ Type' , 'R Type')
+kable(df)
+```
+
+---
+# Declaring model parameters<br><br>
+
+.pull-left-narrow[
+TMB code
+```cpp
+PARAMETER_VECTOR(beta); 
+PARAMETER(ln_sigma); 
+PARAMETER_MATRIX(u); 
+```
+]
+
+.pull-right-wide[
+R script
+```{r}
+Pars <- list(
+   beta = c(0,0),
+   lnSigma = 0,
+   u = matrix(0,3,3) 
+)
+
+str(Pars) 
+```
+]
+
+
+---
+#Building a TMB model in R<br><br>
+
+* All C++ models, including TMB, need to be compiled
+  * In TMB, this creates a dynamic link library (.dll)
+  * The .dll file needs to be loaded for R to access
+```{r}
+library(TMB)
+compile('src/linreg.cpp')
+dyn.load(dynlib('src/linreg'))
+```
+
+---
+#Building a TMB model in R<br>
+
+* TMB additionally needs to build a computational graph
+  * This sets up derivative chain used to determine the gradiant functions
+  * TMB has a static graph, so this step happens before optimization
+  * The R function, MakeADFun() completes this step
+```{r}
+#Simulate data 
+set.seed(123)
+Data <- list(y = rnorm(10) + 1:10, 
+             X=cbind(rep(1,10),1:10))
+obj <- MakeADFun(data = Data, 
+                 parameters = list(beta = c(0,0),lnSigma = 0), 
+                 DLL = 'linreg')
+```
+MakeADFun output:
+* **par**: initial values
+* **fn**: the likelihood function
+* **gr**: the gradient function
+* **report**: return values wrapped in REPORT()
+* **env**: environment with access to all parts of structure
+
+---
+
+#Building a TMB model in R<br>
+* The model is optimized outside of TMB using any R minimizer
+* nlminb is a base R minimizer frequently used for TMB models
+```{r, echo = TRUE, results = "hide"}
+# Pass initial values, function, and gradient functions
+opt <- nlminb(obj$par, obj$fn, obj$gr)
+```
+Report objects back to R
+```{r}
+report <- obj$report()
+report$sig2
+```
+nlminb output:
+* **par**: MLEs
+* **objective**: the nll associated with the MLEs
+* **convergence**: 0 indicates successful convergence
+* **message**: convergence message
+* **iterations**: number of iterations
+* **evaluations**: number of objective and gradient function evaluations
+---
+# Check model convergence
+
+```{r}
+#Check maximum gradient < 0.0001
+obj$gr()
+#Check convergence error = 0
+opt$convergence
+#Check convergence message
+opt$message
+```
+---
+# Uncertainty 
+
+```{r, echo = TRUE, results = 'hide'}
+sdr <- sdreport(obj)
+```
+```{r}
+summary(sdr, "fixed")
+summary(sdr, "report")
+
+#Check Hessian is positive definite
+sdr$pdHess
+```
+---
+# Debugging: Error types<br>
+.pull-left[
+1. **Compile time errors**
+2. TMB-R linkage errors
+3. Runtime errors
+4. Convergence errors
+]
+
+.pull-right[
+Fails with errors when compiling
+* Incorrect syntax: e.g., missing **)** or **;**
+* Wrong type, for example:
+  * int instead of Type
+  * passing matrix to a function that accepts a vector
+* Undeclared variable
+]
+
+```cpp
+DATA_VECTOR(y
+DATA_MATRIX(X);
+
+PARAMETER_VECTOR(beta);
+
+int nll;
+matrix<Type> mu = X*beta;
+nll = -dnorm(y,mu,sigma,true)
+return nll;
+```
+---
+
+# Debugging: Error types<br>
+.pull-left[
+1. Compile time errors
+2. **TMB-R linkage errors**
+3. Runtime errors
+4. Convergence errors
+]
+
+.pull-right[
+Compiles but MakeADFun crashes
+* .dll not loaded in R
+* Incorrect data/parameter types or missing value
+* Dimension mismatch
+]
+
+.pull-left[
+linreg.cpp
+```cpp
+DATA_VECTOR(y);
+DATA_MATRIX(X);
+
+PARAMETER_VECTOR(beta);
+PARAMETER(lnSigma);
+Type sigma = exp(lnSigma);
+
+Type nll = 0;
+vector<Type> mu = X*beta;
+nll -= sum(dnorm(y,mu,sigma,true));
+return nll;
+```
+]
+
+.pull-right[
+linreg.R
+```{r, eval = FALSE}
+library(TMB)
+compile(linreg.cpp)
+Data <- list(y = c(-2.1, 3.3, 4.2),
+             X = data.frame(c(1,1),c(4,5))
+Pars <- list(beta = 0)
+obj <- MakeADFun(data = Data, 
+                 parameters = Pars, 
+                 DLL = "linreg")
+```
+]
+
+---
+
+# Debugging: Error types<br>
+.pull-left[
+1. Compile time errors
+2. TMB-R linkage errors
+3. **Runtime errors**
+4. Convergence errors
+]
+
+.pull-right[
+Model fails during minimization
+  * Data-distribution mismatich 
+  * Incorrect parameter transformation
+  * Not taking log of the likelihood
+  * Illegal mathematical operations, eg. log(-1)
+]
+
+.pull-left[
+linreg.cpp
+```cpp
+DATA_VECTOR(y);
+DATA_MATRIX(X);
+
+PARAMETER_VECTOR(beta);
+PARAMETER(sigma);
+
+Type nll = 0;
+vector<Type> mu = log(X*beta);
+nll -= sum(dlnorm(y,mu,sigma));
+return nll;
+```
+]
+
+.pull-right[
+simple.R
+```{r, eval = FALSE}
+library(TMB)
+compile(linreg.cpp)
+dyn.lib(dynload("linreg"))
+Data <- list(y = c(-2.1, 3.3, 4.2),
+             X = cbind(c(1,1,1),c(4,5,2))
+Pars <- list(beta = c(0,0), sigma = 0)
+obj <- MakeADFun(data = Data, 
+                 parameters = Pars, 
+                 DLL = "linreg")
+opt <- nlminb(obj$par, obj$fn, obj$gr)
+```
+]
+
+---
+
+# Debugging: Error types<br>
+.pull-left[
+1. Compile time errors
+2. TMB-R linkage errors
+3. Runtime errors
+4. **Convergence errors**
+]
+
+.pull-right[
+ Model compiles and runs but fails to converge
+  * Singular convergence: model is likely overparameterized
+  * False convergence: likelihood may be discontinuous
+  * Relative convergence but Hessian not positive definite: singularity
+]
+
+
+
+
