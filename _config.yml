@@ -1,6 +1,6 @@
-title: xaringan NMFS
-description: Some templates for NMFS presentations with xaringan
-logo: docs/static/xaringan-template.png
+title: TMB Training
+description: A repository of TMB training material
+logo: docs/static/logos/NOAA-color-logo-web.png
 show_downloads: true
 theme: jekyll-theme-minimal
 plugins:
