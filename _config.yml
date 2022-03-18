@@ -1,6 +1,6 @@
 title: TMB Training
 description: A repository of TMB training material
-logo: docs/static/logos/NOAA-color-logo-web.png
+logo: docs/static/logos/logo.png
 show_downloads: true
 theme: jekyll-theme-minimal
 plugins:
