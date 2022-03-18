@@ -61,6 +61,12 @@ xaringanExtra::use_tile_view()
   * Gradients (derivative vectors) are used for faster optimization
 
 ---
+
+class: middle
+
+# A refresher on Maximum Likelihood Inference
+
+---
 # ML Inference
 
 What is the likelihood for 30 successes in 100 trials?
@@ -156,6 +162,66 @@ nll <- -dbinom(30,100,.3,TRUE)
 segments(0.1, nll, 0.5, nll, col='red', lwd=2)
 ```
 ]
+---
+#Uncertainty and the $f(y)^{''}$
+
+.pull-left[
+* The second derivative measures the curvature of the likelihood:
+
+\begin{align}
+\frac{d(\ell(p; n, y))}{dp} &= \frac{y}{p} + \frac{n-y}{1-p} \\
+\frac{d^2(\ell(p; n, y))}{dp^2} &= -\frac{y}{p^2}- \frac{n-y}{(1-p)^2}
+\end{align}
+
+* In the Binomial case, the second derivative is always negative, therefore, the likelihood has a global maximum (the nll has a global minimum)
+]
+.pull-right[
+$-ln\big[L(p; N = 100, y = 30)\big]$
+```{r, eval=TRUE, echo = FALSE}
+curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
+nll <- -dbinom(30,100,.3,TRUE)
+segments(0.1, nll, 0.5, nll, col='red', lwd=2)
+```
+]
+---
+#Uncertainty and the $f(y)^{''}$
+
+* The curvature of the likelihood is related to it's spread
+* The second derivative evaluated at the MLE is directly proportional to the variance
+
+\begin{align}
+p &= y/n \\
+y &= np \\
+\frac{d^2(\ell(p; n, y))}{dp^2} &= -\frac{y}{p^2}- \frac{n-y}{(1-p)}^2 \\
+ &= -\frac{np}{p^2}- \frac{n-np}{(1-p)}^2 \\
+ &= -\frac{n}{p} - \frac{n}{1-p} \\
+ &= \frac{-n}{p(1-p)}
+\end{align}
+
+---
+#Uncertainty and the $f(y)^{''}$
+
+* The curvature of the likelihood is related to it's spread
+* The second derivative evaluated at the MLE is directly proportional to the variance
+
+\begin{align}
+\frac{d^2(\ell(p; n, y))}{dp^2} &= \frac{-n}{p(1-p)}\\
+\\
+Var(p) &= \frac{p(1-p)}{n}\\
+\\
+\frac{d^2(\ell(p; n, y))}{dp^2} &= \frac{-1}{Var(p)}
+\end{align}
+
+* When estimating more than one parameter, we calculate the Hessian as the matrix of partial derivatives
+
+\begin{align}
+(\mathbb{H}_{f})_{i,j} &= \frac{\partial^2f}{\partial \theta_{i}, \partial x\theta_{j}} = \frac{-1}{Var(\Theta)}
+\end{align}
+---
+class: middle
+
+# Maximum Likelihood Inference with TMB
+
 ---
 
 # ML with TMB:
@@ -331,8 +397,8 @@ str(Pars)
   * The .dll file needs to be loaded for R to access
 ```{r}
 library(TMB)
-compile('src/linreg.cpp')
-dyn.load(dynlib('src/linreg'))
+compile('../src/linreg.cpp')
+dyn.load(dynlib('../src/linreg'))
 ```
 
 ---
@@ -547,6 +613,26 @@ opt <- nlminb(obj$par, obj$fn, obj$gr)
   * Relative convergence but Hessian not positive definite: singularity
 ]
 
+---
+class: middle
+
+# Hierarchical modeling with TMB
+
+---
+#The Hierarchical model<br><br><br>
+
+$$\Large \int_{\mathbb{R}}f(y;u,\theta)f(u;\theta)du$$
+---
+# The Laplace approximation<br>
+
+The marginal likelihood of the data after integrating out random effects, $u$: 
+$$L(\theta) = \int_{\mathbb{R}}f(y;u,\theta)f(u;\theta)du$$
+1. The random effects likelihood is minimized to find $\hat{u}$:
+$$\hat{u}(\theta) = \underset{u}{argmin}f(u,\theta)$$
+2. The Hessian (matrix of partial 2nd derivatives) of $f(u,\theta)$ w.r.t. $u$ is evaluated at $\hat{u}(\theta)$:
+$$\mathbb{H}(\theta) = f^{"}_{uu}(\hat{u}(\theta), \theta)$$
+3. The Laplace approximation for the marginal likelihood is:
+$$L^{*}(\theta) = \sqrt{2\pi}^{n}det(\mathbb{H})^{-1/2}f(y,\hat{u}, \theta)$$
 
 
 
