@@ -633,6 +633,120 @@ $$\hat{u}(\theta) = \underset{u}{argmin}f(u,\theta)$$
 $$\mathbb{H}(\theta) = f^{"}_{uu}(\hat{u}(\theta), \theta)$$
 3. The Laplace approximation for the marginal likelihood is:
 $$L^{*}(\theta) = \sqrt{2\pi}^{n}det(\mathbb{H})^{-1/2}f(y,\hat{u}, \theta)$$
+---
+#Implementing random effects in TMB
 
+Random effect group term:
+$$u \sim N(0, \sigma_{u})$$
+Observations:
+\begin{align}
+\mu &= X\beta + Bu\\
+y &\sim N(0,\sigma_{y})
+\end{align}
 
+---
+#Implementing RE in TMB
 
+.pull-left[
+```cpp
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(y);         
+  DATA_SPARSE_MATRIX(B);  
+  DATA_SPARSE_MATRIX(X); 
+  PARAMETER_VECTOR(u);    
+  PARAMETER_VECTOR(beta); 
+  PARAMETER(lnSDu);      
+  PARAMETER(lnSDy);     
+
+  Type nll = 0;
+  Type sdu = exp(lnSDu);
+  nll -= dnorm(u, Type(0), sdu, true).sum();
+
+  vector<Type> mu = X * beta + B * u;
+  Type sdy = exp(lnSDy);
+  nll -= dnorm(y, mu, sdy, true).sum();
+
+   return ans;
+}
+```
+]
+
+.pull-right[
+Simulate Data:
+```{r}
+set.seed(123)
+yr <- rep(1900:2010,each=2)
+year <- factor(yr)
+quarter <- factor(
+  rep(1:4,length.out=length(year))
+)
+period <- factor((yr > mean(yr))+1)
+## Random year+quarter effect, 
+## fixed period effect:
+B <- model.matrix(~year+quarter-1)
+X <- model.matrix(~period-1)
+B <- as(B,"dgTMatrix")
+X <- as(X,"dgTMatrix")
+u <- rnorm(ncol(B)) ## logsdu=0
+beta <- rnorm(ncol(X))*100
+eps <- rnorm(nrow(B),sd=1) ## logsd0=0
+y <- as.numeric( 
+  X %*% beta + B %*% u + eps
+)
+```
+]
+
+---
+#Implementing RE in TMB
+
+.pull-left[
+```cpp
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(y);         
+  DATA_SPARSE_MATRIX(B);  
+  DATA_SPARSE_MATRIX(X); 
+  PARAMETER_VECTOR(u);    
+  PARAMETER_VECTOR(beta); 
+  PARAMETER(lnSDu);      
+  PARAMETER(lnSDy);     
+
+  Type nll = 0;
+  Type sdu = exp(lnSDu);
+  nll -= dnorm(u, Type(0), sdu, true).sum();
+
+  vector<Type> mu = X * beta + B * u;
+  Type sdy = exp(lnSDy);
+  nll -= dnorm(y, mu, sdy, true).sum();
+
+   return ans;
+}
+```
+]
+
+.pull-right[
+Run Model:
+```{r}
+library(TMB)
+#compile("../src/simple_")
+dyn.load(dynlib("../src/simple_re"))
+obj <- MakeADFun(
+  data=list(y=y, B=B, X=X),
+  parameters=list(u=u*0, beta=beta*0, 
+                  lnSDu=1, lnSDy=1),
+                 random="u",
+                 DLL="simple_re",
+                 silent=TRUE
+                 )
+opt <- nlminb(obj$par, obj$fn, obj$gr)
+c(round(beta,2),0,0)
+round(opt$par,2)
+```
+]
