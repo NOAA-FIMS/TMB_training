@@ -6,7 +6,7 @@ compile("maturity_bb_re.cpp")
 dyn.load(dynlib("maturity_bb_re"))
 
 a50 = 5
-slope = 2
+slope = 0.5
 beta = c(-slope*a50,slope)
 phi = 0.1 #as -> Inf betabin -> binomial
 ages = t(matrix(1:20, 20, 40))
@@ -23,7 +23,7 @@ input = list(data=list(),par=list())
 
 input$par$beta = beta
 input$par$log_phi = log(phi)
-input$par$AR_pars = c(log(0.2), gen.logit(0.5,-1,1))
+input$par$AR_pars = c(log(1), gen.logit(0.5,-1,1))
 input$par$re = rep(0, NROW(Y_bb))
 
 input$data$Y = c(Y_bb)
@@ -39,8 +39,11 @@ input$data = mod$simulate(complete=TRUE)
 
 opt = nlminb(mod$par, mod$fn, mod$gr)
 mod$rep = mod$report()
+matrix(mod$rep$mat, 40)
 mod$sdrep = sdreport(mod)
 summary(mod$sdrep)
+mod$env$parList()$re
+input$data$re
 
 set.seed(456)
 newdat = mod$simulate(complete = TRUE)

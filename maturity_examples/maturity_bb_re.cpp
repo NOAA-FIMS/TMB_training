@@ -35,13 +35,15 @@ Type objective_function<Type>::operator() ()
   Type phi = exp(log_phi);
 
   int n_obs = Y.size();
+  vector<Type> nll_re(re.size());
   vector<Type> nll(n_obs);
   nll.setZero();
+  nll_re.setZero();
 
   Type sig_re = exp(AR_pars(0));
   Type rho_re = -1 + 2/(1+exp(-AR_pars(1)));
-  nll -= dnorm(re(0), Type(0), sig_re*exp(-Type(0.5) * log(1 - pow(rho_re,Type(2)))), 1);
-  for(int y = 1; y < re.size(); y++) nll -= dnorm(re(y), rho_re * re(y-1), sig_re, 1);
+  nll_re(0) -= dnorm(re(0), Type(0), sig_re*exp(-Type(0.5) * log(1 - pow(rho_re,Type(2)))), 1);
+  for(int y = 1; y < re.size(); y++) nll_re(y) -= dnorm(re(y), rho_re * re(y-1), sig_re, 1);
   SIMULATE{
     re(0) = rnorm(Type(0), sig_re*exp(-Type(0.5) * log(Type(1) - pow(rho_re,Type(2)))));
     for(int y = 1; y < re.size(); y++) re(y) = rnorm(rho_re * re(y-1), sig_re);
@@ -55,8 +57,7 @@ Type objective_function<Type>::operator() ()
     nll(i) = -dbetabinom(Y(i), N(i), mat(i), phi, 1); //negative log-likelihood
     //nll(i) = -dbinom(Y(i), N(i), mat(i), 1);   //negative log-likelihood
   }
-  SIMULATE 
-  {
+  SIMULATE {
     for(int i = 0; i < n_obs; i++) Y(i) = rbetabinom(N(i), mat(i), phi);
     REPORT(Y);
   }
@@ -69,8 +70,9 @@ Type objective_function<Type>::operator() ()
   ADREPORT(phi);
   ADREPORT(a50);
   REPORT(nll);
+  REPORT(nll_re);
   ADREPORT(logit_mat_at_age);
   ADREPORT(mat_at_age);
-  return sum(nll);
+  return sum(nll) + sum(nll_re);
 }
 
