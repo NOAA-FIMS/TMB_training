@@ -1,9 +1,9 @@
 library(TMB)
 precompile()
 
-dyn.unload(dynlib("maturity_0"))
-compile("maturity_0.cpp")
-dyn.load(dynlib("maturity_0"))
+dyn.unload(dynlib("maturity_examples/maturity_0"))
+compile("maturity_examples/maturity_0.cpp")
+dyn.load(dynlib("maturity_examples/maturity_0"))
 
 a50 = 5
 slope = 2
