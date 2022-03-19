@@ -125,7 +125,7 @@ What is the likelihood for 30 successes in 100 trials?
 $-\ell(p; n, y) = -[ln\big(\frac{n!}{y!(n-y)!}\big) + yln(p)$<br>
      $$+ (n-y)ln(1-p)]$$
 4. Calculate the derivative w.r.t. $p$<br><br>
-$\frac{d(-\ell(p; n, y))}{dp} = -\frac{y}{p}- \frac{n-y}{1-p}$
+$\frac{d(\ell(p; n, y))}{dp} = \frac{y}{p}- \frac{n-y}{1-p}$
 ]
 
 .pull-right[
@@ -148,7 +148,7 @@ What is the likelihood for 30 successes in 100 trials?
 5. Set to 0 and solve for MLE<br><br>
 for n = 100 and y = 30, 
 \begin{align}
-0 &= -\frac{y}{p}- \frac{n-y}{1-p}\\
+0 &= \frac{y}{p}- \frac{n-y}{1-p}\\
 \hat{p} &= \frac{y}{n} \\
 \hat{p} &= \frac{30}{100} = 0.3
 \end{align}
@@ -169,7 +169,7 @@ segments(0.1, nll, 0.5, nll, col='red', lwd=2)
 * The second derivative measures the curvature of the likelihood:
 
 \begin{align}
-\frac{d(\ell(p; n, y))}{dp} &= \frac{y}{p} + \frac{n-y}{1-p} \\
+\frac{d(\ell(p; n, y))}{dp} &= \frac{y}{p} - \frac{n-y}{1-p} \\
 \frac{d^2(\ell(p; n, y))}{dp^2} &= -\frac{y}{p^2}- \frac{n-y}{(1-p)^2}
 \end{align}
 
