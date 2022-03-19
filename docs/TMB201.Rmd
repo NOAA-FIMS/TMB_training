@@ -1,0 +1,372 @@
+---
+title:  "TMB 201"
+subtitle: "FIMS Implementation Team Workshop"
+author: "Tim Miller<br>NOAA Fisheries, NEFSC<br> 2022-03-23"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: ["xaringan-themer.css", "slides-style.css"]
+    lib_dir: libs
+    nature:
+      ratio: '4:3'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc( (%current% - 1) / (%total% - 1) * 100%);">
+          </div>
+        </div>`
+---
+layout: true
+
+.footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
+
+
+<style type="text/css">
+
+code.cpp{
+  font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-tile-view, echo=FALSE}
+# this gives you a tile navigation if you type "O" at any time
+xaringanExtra::use_tile_view()
+```
+
+---
+#TMB Advanced Topics<br><br><br>
+
+#### 1. Dealing with Parameters
+#### 2. Uncertainty
+#### 3. Simulation
+#### 4. Model Validation
+---
+#Maturity at age model<br>
+The number of mature fish, $C_{y,a}$ out of the total number of fish, $N_{y,a}$ at year, $y$ and age, $a$, can be expressed as a binomial distribution,
+
+$$C_{y,a} \sim Binom(N_{y,a}, p^{M}_{y,a})$$,
+
+where $p^{M}$ represents the probability of maturity, which can be expressed as a logistic transformation of a slope parameter and $a_{50}$, the age of 50% maturity,
+
+\begin{align}
+\beta &= c(-slope*a50, slope)\\
+\eta_{y,a} &= \beta_{0} + \beta_{1}*a\\
+p^{M}_{y,a} &= \frac{1}{1+exp(-\eta_{y,a})}
+\end{align}
+
+---
+#Maturity at age model<br>
+
+.pull-left[
+```cpp
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(Y);
+  DATA_VECTOR(N);
+  DATA_VECTOR(age_obs); 
+  DATA_INTEGER(max_age); 
+  PARAMETER_VECTOR(beta); 
+
+  int n_obs = Y.size();
+  vector<Type> nll(n_obs);
+  nll.setZero();
+     
+  vector<Type> logit_mat(n_obs);
+  vector<Type> mat(n_obs);
+  for(int i = 0; i < n_obs; i++) {
+    logit_mat(i) = beta(0) + 
+       beta(1)*age_obs(i); 
+    mat(i) = 1/(1 + exp(-logit_mat(i)));
+    nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  }
+
+  return sum(nll);
+}
+```
+]
+
+.pull-right[
+Simulate data
+```{r, eval = FALSE}
+a50 = 5
+slope = 2
+beta = c(-slope*a50,slope)
+ages = t(matrix(1:20, 20, 40))
+mat = 1/(1+exp(-(beta[1] + beta[2]*ages)))
+set.seed(123)
+samp <- sample(50:100, length(ages),
+               replace=TRUE)
+N = matrix(samp, nrow = 20)
+ysim <- rbinom(length(N), N, mat)
+Y = matrix(ysim, nrow = 20)
+```
+]
+---
+
+#Maturity at age model<br>
+
+.pull-left[
+```cpp
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(Y);
+  DATA_VECTOR(N);
+  DATA_VECTOR(age_obs); 
+  DATA_INTEGER(max_age); 
+  PARAMETER_VECTOR(beta); 
+
+  int n_obs = Y.size();
+  vector<Type> nll(n_obs);
+  nll.setZero();
+     
+  vector<Type> logit_mat(n_obs);
+  vector<Type> mat(n_obs);
+  for(int i = 0; i < n_obs; i++) {
+    logit_mat(i) = beta(0) + 
+       beta(1)*age_obs(i); 
+    mat(i) = 1/(1 + exp(-logit_mat(i)));
+    nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  }
+
+  return sum(nll);
+}
+```
+]
+
+.pull-right[
+Run model
+```{r, eval = FALSE}
+library(TMB)
+compile("maturity_0.cpp")
+dyn.load(dynlib("maturity_0"))
+
+input = list(data=list(),par=list())
+input$par$beta = c(0,0)
+input$data$Y = c(Y)
+input$data$N = c(N)
+input$data$age_obs = c(ages)
+input$data$max_age = max(ages)
+
+mod = MakeADFun(input$data, input$par, 
+                DLL = "maturity_0")
+
+opt = nlminb(mod$par, mod$fn, mod$gr)
+```
+]
+
+---
+class: middle
+
+#Uncertainty
+---
+#Estimating Uncertainty<br><br>
+
+Uncertainty estimates can be calculated in several ways with TMB
+ * Asymptotic approximation + delta method
+ * Likelihood profiles
+
+---
+##Asymptotic approximation with $f''$
+
+The second derivative measures the curvature of the likelihood and is approximately equal to the negative inverse of the variance when evaluated at the MLE
+
+Poisson Likelihood: $f(y) = \frac{e^{-\lambda}\lambda^{y}}{y!}$, for **y = 2**:
+.three-column[
+log-likelihood: 
+
+
+$\small \ell(\lambda) = -\lambda + ylog(\lambda) - log(y!)$
+```{r echo = FALSE}
+curve(log(dpois(2,x)), xlab = expression(lambda), ylab = expression("l("~ lambda ~ "|y=2)"),0,5, cex.lab = 1.5)
+```
+
+]
+
+.three-column[
+1st derivative: 
+
+$\frac{d\ell(\lambda)}{d\lambda} = -n + \frac{y}{\lambda}$
+```{r echo = FALSE}
+pois.1d <- function(x,y){-1 + y/x}
+curve(pois.1d(x,2), xlab = expression(lambda), ylab = expression("l("~ lambda ~ "|y=2)'"),0,5, cex.lab = 1.5)
+```
+$\frac{\hat{y}}{n} = \lambda$
+]
+
+.three-column[
+2nd Derivative: 
+
+$\frac{d^{2}\ell(\lambda)}{d\lambda^{2}} = -\frac{y}{\lambda^{2}}$
+
+Evaluated at the MLE:
+$$-\frac{n\lambda}{\lambda^{2}} = -\frac{n}{\lambda}$$
+$$Var(\lambda) = \frac{\lambda}{n}$$
+
+]
+
+---
+#Multivariate asymptotics
+
+* For N-d models, the shape is represented by a NxN **Hessian** matrix of 2nd partial derivatives
+* Inverting the negative Hessian gives us a covariance matrix
+* Same intution about "steepness"
+
+\begin{align}
+(\mathbb{H}_{f})_{i,j} &= \frac{\partial^2f}{\partial \theta_{i}, \partial x\theta_{j}} = \frac{-1}{Var(\Theta)}
+\end{align}
+
+.three-column[
+![](static/mvn1.png)
+]
+.three-column[<br><br>Which will have the smaller SE?]
+.three-column[
+![](static/mvn2.png)
+]
+---
+# Non-Invertible Hessians<br><br>
+* The Hessian will **not be invertible** if the MLE is not a true minimum
+* When could this occur? Usually mis-specified models
+ * Parameters confounded or overparameterized (too complex for data)
+ * Confounded model example:
+ ```{r, eval = FALSE}
+ x1 <- rnorm(50); x2 <- x1; lm(y~x1+x2)
+ ```
+ * Why confounded? lm estimates slope of x2 as NA
+ 
+* TMB will warn about uninvertible Hessians (NaNs)
+
+---
+#Asymptotics in TMB<br><br>
+
+* Hessian is hard to calculate
+* TMB uses AD 
+```{r, eval = FALSE}
+obj$he
+```
+* This can be accessed with:
+```{r, eval = FALSE}
+summary(sdreport(obj), 'fixed')
+fit.cov <- sdreport(obj)$cov.fixed
+ses <- sqrt(diag(fit.cov))
+```
+
+* Under these assumptions we create a confidence interval as MLE +/- 1.96*SE
+
+---
+##Uncertainity for derived quantities<br><br>
+
+* Inverting the Hessian only works for parameters
+
+* We often want uncertainty for functions of parameters (‘derived quantities’)
+
+* In the maturity at age model, we want to know the uncertainty of $a50$
+
+* We know the SE for $\beta_{0}$ and $\beta_{1}$ from the inverted Hessian (it is a parameter)
+
+* We also know that $a50 = -\beta_{0}/\beta_{1}$
+
+* We can use the **Delta method** to calculate $Var(a50)$ 
+
+---
+#Delta method<br>
+
+Univariate Delta method:
+$$Var[g(\theta)] \approx g'(\theta)^2var(\theta)$$
+Multivariate Delta method:
+$$Var[g(\Theta)] \approx G(\Theta)Var(\Theta)G(\Theta)$$
+
+where $G(\Theta)$ is the Jacobian matrix of partial 1st derivatives
+<br>
+
+TMB calculates the multivariate Delta method automatically:
+.pull-left[
+```cpp
+Type a50 = -beta(0) / beta(1);
+ADREPORT(a50);
+```
+]
+.pull-right[
+```{r, eval = FALSE}
+sdr <- sdreport(obj)
+summary(sdr, 'report')
+```
+]
+
+---
+# Lkelihood Profiles<br><br>
+* Does not make the asymptotic normal assumption
+
+* Essentially: Refit model at series of points, doing likelihood ratio tests at each one
+
+* Theory not covered here, but a good approach.
+
+* Easy to do in TMB: 
+```{r, eval = FALSE}
+#profile beta0
+prof <- TMB::tmbprofile(obj, 1)
+plot(prof)
+confint(prof)
+```
+
+* Then plot(prof) and confint(prof) plot and give 95% range
+
+* This interval may not be symmetic nor finite
+
+---
+class: middle
+
+#Simulation
+---
+#Simulation in TMB
+
+* TMB offers functionality to simulate data within the TMB model
+* TMB provides standard generator functions:
+ * rnorm() rpois() runif() rgamma() ...
+* Simulation blocks are used to call simulations from R
+
+.pull-left[
+```cpp
+for(int i = 0; i < n_obs; i++){
+  logit_mat(i) = beta(0) + 
+     beta(1)*age_obs(i); 
+  mat(i) = 1/(1 + exp(-logit_mat(i)));
+  nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  SIMULATE{
+    Y(i) = rbinom(N(i), mat(i));
+  }
+}
+SIMULATE{
+  REPORT(Y);
+}
+```
+]
+
+.pull-right[
+```{r, eval = FALSE}
+mod <- MakeADFun(input$data, input$par, 
+                DLL = "maturity_0")
+
+opt <- nlminb(mod$par, mod$fn, mod$gr)
+
+y.sim <- mod$simulate()
+```
+]
+---
