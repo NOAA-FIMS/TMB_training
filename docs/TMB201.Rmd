@@ -175,6 +175,47 @@ opt = nlminb(mod$par, mod$fn, mod$gr)
 ---
 class: middle
 
+#Dealing with parameters
+---
+#Parameter transformations
+
+#### Two types of transformations:
+1. Individual parameters to map from real to parameter space
+  * Minimizers search for MLE from $-\infty$ to $+\infty$
+  * Certain parameters have restricted support:
+      * $\sigma^{2} > 0$
+        ```cpp
+        sigma = exp(ln_sigma)
+        ```
+      * $0 < \pi < 1$
+      ```cpp
+      pi = 1/(1 + exp(-logit_pi))
+      ```
+2. Expected values of distributions
+  * Generalized Linear or Generalized Linear Mixed Models: model a function of the mean that is linear in X, for example:
+    * $\eta = X\beta$
+    * $y \sim Pois(exp(\eta))$
+    * $y \sim Binomial(N, invlogit(\pi))$
+  
+---
+#Parameter mapping
+#### TMB allows users to collect and fix parameters using the map argument in MakeADFun()
+* The parameter map is a list of parameters that are fixed or collected in a model run
+* Parameter names and dimensions in the map list must match those of the parameter list
+* The map list is structured as a list of factors
+* Parameters with factor(NA) are fixed
+* Parameters with equal factor levels are collected to a common value
+
+```{r, eval = FALSE}
+#fix slope = 0 : constant proportion with age
+input$map$beta = factor(c(1,NA)) 
+
+#intercept = slope
+input$map$beta = factor(c(1,1)) 
+```
+---
+class: middle
+
 #Simulation
 ---
 #Simulation in TMB
