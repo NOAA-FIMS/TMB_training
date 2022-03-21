@@ -163,61 +163,85 @@ segments(0.1, nll, 0.5, nll, col='red', lwd=2)
 ```
 ]
 ---
-#Uncertainty and the $f(y)^{''}$
+class: middle
 
-.pull-left[
-* The second derivative measures the curvature of the likelihood:
+#Uncertainty
 
-\begin{align}
-\frac{d(\ell(p; n, y))}{dp} &= \frac{y}{p} - \frac{n-y}{1-p} \\
-\frac{d^2(\ell(p; n, y))}{dp^2} &= -\frac{y}{p^2}- \frac{n-y}{(1-p)^2}
-\end{align}
+---
+##Asymptotic approximation with $f''$
 
-* In the Binomial case, the second derivative is always negative, therefore, the likelihood has a global maximum (the nll has a global minimum)
-]
-.pull-right[
-$-ln\big[L(p; N = 100, y = 30)\big]$
-```{r, eval=TRUE, echo = FALSE}
-curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
-nll <- -dbinom(30,100,.3,TRUE)
-segments(0.1, nll, 0.5, nll, col='red', lwd=2)
+The second derivative measures the curvature of the likelihood and is approximately equal to the negative inverse of the variance when evaluated at the MLE
+
+Poisson Likelihood: $f(y) = \frac{e^{-\lambda}\lambda^{y}}{y!}$, for **y = 2**:
+.three-column[
+log-likelihood: 
+
+
+$\small \ell(\lambda) = -\lambda + ylog(\lambda) - log(y!)$
+```{r echo = FALSE}
+curve(log(dpois(2,x)), xlab = expression(lambda), ylab = expression("l("~ lambda ~ "|y=2)"),0,5, cex.lab = 1.5)
 ```
+
 ]
+
+.three-column[
+1st derivative: 
+
+$\frac{d\ell(\lambda)}{d\lambda} = -n + \frac{y}{\lambda}$
+```{r echo = FALSE}
+pois.1d <- function(x,y){-1 + y/x}
+curve(pois.1d(x,2), xlab = expression(lambda), ylab = expression("l("~ lambda ~ "|y=2)'"),0,5, cex.lab = 1.5)
+```
+$\frac{\hat{y}}{n} = \lambda$
+]
+
+.three-column[
+2nd Derivative: 
+
+$\frac{d^{2}\ell(\lambda)}{d\lambda^{2}} = -\frac{y}{\lambda^{2}}$
+
+Evaluated at the MLE:
+$$-\frac{n\lambda}{\lambda^{2}} = -\frac{n}{\lambda}$$
+$$Var(\lambda) = \frac{\lambda}{n}$$
+
+]
+
 ---
-#Uncertainty and the $f(y)^{''}$
+#Multivariate asymptotics
 
-* The curvature of the likelihood is related to it's spread
-* The second derivative evaluated at the MLE is directly proportional to the variance
-
-\begin{align}
-p &= y/n \\
-y &= np \\
-\frac{d^2(\ell(p; n, y))}{dp^2} &= -\frac{y}{p^2}- \frac{n-y}{(1-p)}^2 \\
- &= -\frac{np}{p^2}- \frac{n-np}{(1-p)}^2 \\
- &= -\frac{n}{p} - \frac{n}{1-p} \\
- &= \frac{-n}{p(1-p)}
-\end{align}
-
----
-#Uncertainty and the $f(y)^{''}$
-
-* The curvature of the likelihood is related to it's spread
-* The second derivative evaluated at the MLE is directly proportional to the variance
-
-\begin{align}
-\frac{d^2(\ell(p; n, y))}{dp^2} &= \frac{-n}{p(1-p)}\\
-\\
-Var(p) &= \frac{p(1-p)}{n}\\
-\\
-\frac{d^2(\ell(p; n, y))}{dp^2} &= \frac{-1}{Var(p)}
-\end{align}
-
-* When estimating more than one parameter, we calculate the Hessian as the matrix of partial derivatives
+* For N-d models, the shape is represented by a NxN **Hessian** matrix of 2nd partial derivatives
+* Inverting the negative Hessian gives us a covariance matrix
+* Same intution about "steepness"
 
 \begin{align}
 (\mathbb{H}_{f})_{i,j} &= \frac{\partial^2f}{\partial \theta_{i}, \partial x\theta_{j}} = \frac{-1}{Var(\Theta)}
 \end{align}
+
+.three-column[
+![](static/mvn1.png)
+]
+.three-column[<br><br>Which will have the smaller SE?]
+.three-column[
+![](static/mvn2.png)
+]
 ---
+#Asymptotics in TMB<br><br>
+
+* Hessian is hard to calculate
+* TMB uses AD 
+```{r, eval = FALSE}
+mod$he
+```
+* This can be accessed with:
+```{r, eval = FALSE}
+summary(sdreport(mod), 'fixed')
+fit.cov <- sdreport(mod)$cov.fixed
+ses <- sqrt(diag(fit.cov))
+```
+
+* Under these assumptions we create a confidence interval as MLE +/- 1.96*SE
+---
+
 class: middle
 
 # Maximum Likelihood Inference with TMB
@@ -247,7 +271,7 @@ class: middle
 
 
 .pull-left[
-linreg.cpp
+linReg.cpp
 
 ```cpp
 // Simple linear regression
@@ -397,8 +421,8 @@ str(Pars)
   * The .dll file needs to be loaded for R to access
 ```{r}
 library(TMB)
-compile('../src/linreg.cpp')
-dyn.load(dynlib('../src/linreg'))
+compile('../src/linReg.cpp')
+dyn.load(dynlib('../src/linReg'))
 ```
 
 ---
@@ -415,7 +439,7 @@ Data <- list(y = rnorm(10) + 1:10,
              X=cbind(rep(1,10),1:10))
 obj <- MakeADFun(data = Data, 
                  parameters = list(beta = c(0,0),lnSigma = 0), 
-                 DLL = 'linreg')
+                 DLL = 'linReg')
 ```
 MakeADFun output:
 * **par**: initial values
@@ -463,7 +487,9 @@ opt$message
 sdr <- sdreport(obj)
 ```
 ```{r}
+#uses the Hessian to calculate parameter uncertainty
 summary(sdr, "fixed")
+#uses the Delta method to calculate undertainty for derived quantities
 summary(sdr, "report")
 
 #Check Hessian is positive definite
@@ -516,7 +542,7 @@ Compiles but MakeADFun crashes
 ]
 
 .pull-left[
-linreg.cpp
+linReg.cpp
 ```cpp
 DATA_VECTOR(y);
 DATA_MATRIX(X);
@@ -533,16 +559,16 @@ return nll;
 ]
 
 .pull-right[
-linreg.R
+linReg.R
 ```{r, eval = FALSE}
 library(TMB)
-compile(linreg.cpp)
+compile(linReg.cpp)
 Data <- list(y = c(-2.1, 3.3, 4.2),
              X = data.frame(c(1,1),c(4,5))
 Pars <- list(beta = 0)
 obj <- MakeADFun(data = Data, 
                  parameters = Pars, 
-                 DLL = "linreg")
+                 DLL = "linReg")
 ```
 ]
 
@@ -565,7 +591,7 @@ Model fails during minimization
 ]
 
 .pull-left[
-linreg.cpp
+linReg.cpp
 ```cpp
 DATA_VECTOR(y);
 DATA_MATRIX(X);
@@ -584,14 +610,14 @@ return nll;
 simple.R
 ```{r, eval = FALSE}
 library(TMB)
-compile(linreg.cpp)
-dyn.lib(dynload("linreg"))
+compile(linReg.cpp)
+dyn.lib(dynload("linReg"))
 Data <- list(y = c(-2.1, 3.3, 4.2),
              X = cbind(c(1,1,1),c(4,5,2))
 Pars <- list(beta = c(0,0), sigma = 0)
 obj <- MakeADFun(data = Data, 
                  parameters = Pars, 
-                 DLL = "linreg")
+                 DLL = "linReg")
 opt <- nlminb(obj$par, obj$fn, obj$gr)
 ```
 ]
@@ -612,6 +638,19 @@ opt <- nlminb(obj$par, obj$fn, obj$gr)
   * False convergence: likelihood may be discontinuous
   * Relative convergence but Hessian not positive definite: singularity
 ]
+
+---
+# Non-Invertible Hessians<br><br>
+* The Hessian will **not be invertible** if the MLE is not a true minimum
+* When could this occur? Usually mis-specified models
+ * Parameters confounded or overparameterized (too complex for data)
+ * Confounded model example:
+ ```{r, eval = FALSE}
+ x1 <- rnorm(50); x2 <- x1; lm(y~x1+x2)
+ ```
+ * Why confounded? lm estimates slope of x2 as NA
+ 
+* TMB will warn about uninvertible Hessians (NaNs)
 
 ---
 class: middle

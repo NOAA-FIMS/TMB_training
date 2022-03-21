@@ -49,8 +49,8 @@ xaringanExtra::use_tile_view()
 #TMB Advanced Topics<br><br><br>
 
 #### 1. Dealing with Parameters
-#### 2. Uncertainty
-#### 3. Simulation
+#### 2. Simulation
+#### 3. Uncertainty
 #### 4. Model Validation
 ---
 #Maturity at age model<br>
@@ -175,6 +175,94 @@ opt = nlminb(mod$par, mod$fn, mod$gr)
 ---
 class: middle
 
+#Dealing with parameters
+---
+#Parameter transformations
+
+#### Two types of transformations:
+1. Individual parameters to map from real to parameter space
+  * Minimizers search for MLE from $-\infty$ to $+\infty$
+  * Certain parameters have restricted support:
+      * $\sigma^{2} > 0$
+        ```cpp
+        sigma = exp(ln_sigma)
+        ```
+      * $0 < \pi < 1$
+      ```cpp
+      pi = 1/(1 + exp(-logit_pi))
+      ```
+2. Expected values of distributions
+  * Generalized Linear or Generalized Linear Mixed Models: model a function of the mean that is linear in X, for example:
+    * $\eta = X\beta$
+    * $y \sim Pois(exp(\eta))$
+    * $y \sim Binomial(N, invlogit(\pi))$
+  
+---
+#Parameter mapping
+#### TMB allows users to collect and fix parameters using the map argument in MakeADFun()
+* The parameter map is a list of parameters that are fixed or collected in a model run
+* Parameter names and dimensions in the map list must match those of the parameter list
+* The map list is structured as a list of factors
+* Parameters with factor(NA) are fixed
+* Parameters with equal factor levels are collected to a common value
+
+```{r, eval = FALSE}
+#fix slope = 0 : constant proportion with age
+input$map$beta = factor(c(1,NA)) 
+
+#intercept = slope
+input$map$beta = factor(c(1,1)) 
+```
+---
+class: middle
+
+#Simulation
+---
+#Simulation in TMB
+
+* Standard generator functions to simulate data within the TMB model:
+
+```cpp
+rnorm()           rpois()           runif()
+rbinom()          rgamma()          rexp()          
+rbeta()           rf()              rlogis()  
+rt()              rweibull()        rcompois()
+rtweedie()        rnbinom()         rnbinom2()
+```
+
+
+* Simulation blocks are used to call simulations from R
+
+.pull-left[
+```cpp
+for(int i = 0; i < n_obs; i++){
+  logit_mat(i) = beta(0) + 
+     beta(1)*age_obs(i); 
+  mat(i) = 1/(1 + exp(-logit_mat(i)));
+  nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  SIMULATE{
+    Y(i) = rbinom(N(i), mat(i));
+  }
+}
+SIMULATE{
+  REPORT(Y);
+}
+```
+]
+
+.pull-right[
+```{r, eval = FALSE}
+mod <- MakeADFun(input$data, input$par, 
+                DLL = "maturity_0")
+
+opt <- nlminb(mod$par, mod$fn, mod$gr)
+
+y.sim <- mod$simulate()
+```
+]
+---
+class: middle
+
 #Uncertainty
 ---
 #Estimating Uncertainty<br><br>
@@ -259,12 +347,12 @@ $$Var(\lambda) = \frac{\lambda}{n}$$
 * Hessian is hard to calculate
 * TMB uses AD 
 ```{r, eval = FALSE}
-obj$he
+mod$he
 ```
 * This can be accessed with:
 ```{r, eval = FALSE}
-summary(sdreport(obj), 'fixed')
-fit.cov <- sdreport(obj)$cov.fixed
+summary(sdreport(mod), 'fixed')
+fit.cov <- sdreport(mod)$cov.fixed
 ses <- sqrt(diag(fit.cov))
 ```
 
@@ -305,7 +393,7 @@ ADREPORT(a50);
 ]
 .pull-right[
 ```{r, eval = FALSE}
-sdr <- sdreport(obj)
+sdr <- sdreport(mod)
 summary(sdr, 'report')
 ```
 ]
@@ -321,7 +409,7 @@ summary(sdr, 'report')
 * Easy to do in TMB: 
 ```{r, eval = FALSE}
 #profile beta0
-prof <- TMB::tmbprofile(obj, 1)
+prof <- TMB::tmbprofile(mod, 1)
 plot(prof)
 confint(prof)
 ```
@@ -333,29 +421,76 @@ confint(prof)
 ---
 class: middle
 
-#Simulation
----
-#Simulation in TMB
+#Model Validation
 
-* TMB offers functionality to simulate data within the TMB model
-* TMB provides standard generator functions:
- * rnorm() rpois() runif() rgamma() ...
-* Simulation blocks are used to call simulations from R
+---
+
+# Quantile Residuals<br>
+
+
+* TMB's **oneStepPredict()** function calculates quantile residuals
+
+.pull-left[<br>
+$\Large r_{i} = \phi^{-1}(F(Y_{i},\Theta))$<br>
+
+$\phi^{-1}$: inverse cdf of the standard normal<br>
+
+$F(Y,\Theta)$: cdf of $f(Y,\Theta)$
+
+]
+
+.pull-right[
+![](static/quantile.png)
+]
+---
+# TMB OSA methods<br><br>
+
+```{r, echo = FALSE}
+mat <- rbind(
+  c("FullGaussian", "Best approach when data and random effects are both normally distributed"),
+  c("oneStepGaussian", "Most efficient one-step method when data and random effects are approximately normal" ),
+  c("cdf", "One-step method that does not require normality but does require a closed form cdf"),
+  c("oneStepGeneric", "One-step method useful when no closed form cdf but slow")
+)
+df <- as.data.frame(mat)
+colnames(mat) <- c('Method', 'Definition')
+knitr::kable(as.data.frame(mat))
+
+```
+* The cdf and oneStepGeneric methods are the only methods available for discrete data
+* OSA residuals are challenging to calculate when data are mixed (eg. delta-lognormal, tweedie)
+
+---
+# Implementing OSA in TMB<br>
 
 .pull-left[
 ```cpp
-for(int i = 0; i < n_obs; i++){
+DATA_VECTOR(Y);
+DATA_VECTOR(N);
+DATA_VECTOR(age_obs); 
+DATA_INTEGER(max_age); 
+PARAMETER_VECTOR(beta); 
+
+DATA_VECTOR_INDICATOR(keep, Y);
+
+...
+
+for(int i = 0; i < n_obs; i++) {
   logit_mat(i) = beta(0) + 
      beta(1)*age_obs(i); 
   mat(i) = 1/(1 + exp(-logit_mat(i)));
-  nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
-  SIMULATE{
-    Y(i) = rbinom(N(i), mat(i));
-  }
+  nll(i) -= keep(i) * 
+      (dbinom(Y(i), N(i), mat(i),1)); 
+  //extra lines required for cdf method:
+  //example given using ppois 
+  //pbinom not in TMB
+  Type cdf = squeeze(ppois(mean(i)));
+  nll -= keep.cdf_lower[i] * 
+      log( cdf );      
+  nll -= keep.cdf_upper[i] * 
+      log( 1.0 - cdf ); 
 }
-SIMULATE{
-  REPORT(Y);
-}
+
 ```
 ]
 
@@ -366,7 +501,12 @@ mod <- MakeADFun(input$data, input$par,
 
 opt <- nlminb(mod$par, mod$fn, mod$gr)
 
-y.sim <- mod$simulate()
+osa <- oneStepPredict(
+  mod, 
+  observation.name = "Y",
+  data.term.indicator = "keep",
+  method = "oneStepGeneric", 
+  discrete = TRUE
+)
 ```
 ]
----
