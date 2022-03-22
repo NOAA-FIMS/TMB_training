@@ -73,6 +73,7 @@ opt2
 #max gradient is not great
 sdreport(mod)
 max(abs(mod$gr(opt2$par)))
+parbad = opt2$par
 # Take a few extra newton steps
 for(i in 1:3){
   g <- as.numeric(mod$gr(opt2$par))
@@ -81,6 +82,7 @@ for(i in 1:3){
   opt2$objective <- mod$fn(opt2$par)
 }
 max(abs(mod$gr(opt2$par)))
+parbad - opt2$par
 
 #random effects model with One-Step-Ahead quantile residuals implemented.
 dyn.unload(dynlib("maturity_examples/maturity_bb_re_osa"))

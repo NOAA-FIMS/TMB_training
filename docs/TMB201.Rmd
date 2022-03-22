@@ -54,6 +54,17 @@ xaringanExtra::use_tile_view()
 #### 3. Simulation
 #### 4. Correlated Gaussian random effects
 #### 5. Diagnostics
+
+---
+# Where to get everything
+
+All slides and code are at [TMB_training](https://github.com/NOAA-FIMS/TMB_training)
+
+.pull-left-wide[
+```{r, echo = FALSE, out.width="100%", fig.align="center"}
+knitr::include_graphics("static/tmb_training_screenshot.png")
+```
+]
 ---
 #Maturity at age model<br>
 The number of mature fish, $Y_{y,a}$ out of the total number of fish, $N_{y,a}$ at year, $y$ and age, $a$, can be expressed as a binomial distribution,
@@ -347,7 +358,7 @@ See
 ---
 # Lkelihood Profiles
 * Does not make the asymptotic normal assumption
-* Essentially: Refit model at series of points, doing likelihood ratio tests at each one
+* Refit model at series of at fixed values for parameter of interest and CI determined by the quantile of a $\chi^2$ with 1 degree of freedom at p = 0.95 (divided by 2 because 2*log-likelihood difference assymptotically has this distribution). 
 * A goood (but slower) approach that works better when likelihood profile is asymmetric.
 
 .pull-left[
@@ -564,10 +575,8 @@ Type objective_function<Type>::operator() ()
   Type phi = exp(log_phi);
 
   int n_obs = Y.size();
-  //vector<Type> nll_re(re.size());
   vector<Type> nll(n_obs);
   nll.setZero();
-  //nll_re.setZero();
 
   Type sig_re = exp(AR_pars(0));
   Type rho_re = -1 + 2/(1+exp(-AR_pars(1)));
@@ -667,30 +676,32 @@ knitr::kable(as.data.frame(mat))
 
 .pull-left[
 ```cpp
-DATA_VECTOR(Y);
-DATA_VECTOR(N);
-DATA_VECTOR(age_obs); 
-DATA_INTEGER(max_age); 
-PARAMETER_VECTOR(beta); 
-
-DATA_VECTOR_INDICATOR(keep, Y);
+  DATA_VECTOR(Y); //number mature
+  DATA_VECTOR_INDICATOR(keep, Y); // for OSA residuals
+  DATA_VECTOR(N); //number of mature + not mature
+  DATA_VECTOR(age_obs); //age for each observation
+  DATA_IVECTOR(re_ind); //indicator for random effect for each observation
+  DATA_INTEGER(max_age); //to generate a maturity ogive
+  PARAMETER_VECTOR(beta); //intercept, slope
+  PARAMETER(log_phi);
+  PARAMETER_VECTOR(AR_pars); //AR1 process (2 pars)
+  PARAMETER_VECTOR(re); //annual ar1 process
 
 ...
 
-for(int i = 0; i < n_obs; i++) {
-  logit_mat(i) = beta(0) + 
-     beta(1)*age_obs(i); 
-  mat(i) = 1/(1 + exp(-logit_mat(i)));
-  nll(i) -= keep(i) * 
-      (dbinom(Y(i), N(i), mat(i),1)); 
-  //extra lines required for cdf method:
-  //example given using ppois 
-  //pbinom not in TMB
-  Type cdf = squeeze(ppois(mean(i)));
-  nll -= keep.cdf_lower[i] * 
-      log( cdf );      
-  nll -= keep.cdf_upper[i] * 
-      log( 1.0 - cdf ); 
+  Type nll_re = SCALE(AR1(rho_re), sig_re)(re); //NEGATIVE log-likelihood returned....
+
+...
+
+  for(int i = 0; i < n_obs; i++) {
+    logit_mat(i) = beta(0)  + beta(1)*age_obs(i) + re(re_ind(i)); 
+    mat(i) = 1/(1 + exp(-logit_mat(i)));
+    nll(i) = -keep(i) * dbetabinom(Y(i), N(i), mat(i), phi, 1); //negative log-likelihood
+  }
+  
+  ...
+  
+  return sum(nll) + nll_re;
 }
 
 ```
@@ -698,22 +709,72 @@ for(int i = 0; i < n_obs; i++) {
 
 .pull-right[
 ```{r, eval = FALSE}
-mod <- MakeADFun(input$data, input$par, 
-                DLL = "maturity_0")
-
+mod = MakeADFun(inputosa$data, inputosa$par, random = "re", DLL = "maturity_bb_re_osa")
 opt <- nlminb(mod$par, mod$fn, mod$gr)
 
-osa <- oneStepPredict(
-  mod, 
-  observation.name = "Y",
-  data.term.indicator = "keep",
+residuals = oneStepPredict(mod, 
+  observation.name = "Y", 
+  data.term.indicator="keep", 
   method = "oneStepGeneric", 
-  discrete = TRUE
-)
+  discrete=TRUE)
+plot(input$data$age_obs, residuals$residual)
+qqnorm(residuals$residual)
+qqline(residuals$residual)
+```
+```{r, echo = FALSE, out.width="60%", fig.align="center"}
+knitr::include_graphics("static/qqnorm.png")
+```
+* See [maturity_bb_re_osa.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re_osa.cpp)
+* [maturity_bb_re.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re.R)
+]
+
+---
+# Gradient checking <br>
+
+* Optimizer may finish with some gradient components with larger (absolute) values than we would like.
+* For example, suppose we wish to ensure the maximum absolute gradient is < 1e-6
+* But doing some Newton steps usually ratchets down the gradient to palatable levels
+
+.pull-left[
+```{r eval = FALSE}
+mod = MakeADFun(input$data, input$par, random = "re", DLL = "maturity_bb_re_density")
+opt2 = nlminb(mod$par, mod$fn, mod$gr)
+#same results (more or less)
+#max gradient is not great
+sdreport(mod)
+max(abs(mod$gr(opt2$par)))
+iter: 1  mgc: 5.406591e-10 
+outer mgc:  0.01812217 
+[1] 0.01812217
+parbad = opt2$par
+```
+* See [maturity_bb_re.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re.R)
+] 
+
+.pull-right[
+```{r eval = FALSE}
+# Take a few extra newton steps
+for(i in 1:3){
+  g <- as.numeric(mod$gr(opt2$par))
+  h <- stats::optimHess(opt2$par, mod$fn, mod$gr)
+  opt2$par <- opt2$par - solve(h, g)
+  opt2$objective <- mod$fn(opt2$par)
+}
+max(abs(mod$gr(opt2$par)))
+iter: 1  value: 1476.141 mgc: 3.900766e-08 ustep: 1 
+mgc: 1.086242e-12 
+outer mgc:  1.51557e-07 
+[1] 1.51557e-07
+parbad - opt2$par
+         beta          beta       log_phi       AR_pars       AR_pars 
+-3.620056e-05  4.722279e-07  9.880448e-05 -7.818749e-06 -1.854744e-07 
 ```
 ]
 
+---
+class: middle
 
+# Extra slides
 
 ---
 ##Asymptotic approximation with $f''$
