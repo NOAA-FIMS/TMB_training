@@ -1,9 +1,9 @@
 library(TMB)
 #precompile()
 
-dyn.unload(dynlib("maturity_bb"))
-compile("maturity_bb.cpp")
-dyn.load(dynlib("maturity_bb"))
+dyn.unload(dynlib("maturity_examples/maturity_bb"))
+compile("maturity_examples/maturity_bb.cpp")
+dyn.load(dynlib("maturity_examples/maturity_bb"))
 
 a50 = 5
 slope = 2
@@ -36,9 +36,10 @@ mod$sdrep = sdreport(mod)
 as.list(mod$sdrep, "Estimate", report = TRUE)$mat_at_age
 
 
-dyn.unload(dynlib("maturity_bb_reg"))
-compile("maturity_bb_reg.cpp")
-dyn.load(dynlib("maturity_bb_reg"))
+#estimate different a50s for early and late periods
+dyn.unload(dynlib("maturity_examples/maturity_bb_reg"))
+compile("maturity_examples/maturity_bb_reg.cpp")
+dyn.load(dynlib("maturity_examples/maturity_bb_reg"))
 
 dd = data.frame(age = c(ages), year = c(years))
 X = cbind(dd$year<=20, dd$year>20, dd$age)

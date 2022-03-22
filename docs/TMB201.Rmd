@@ -5,7 +5,7 @@ author: "Tim Miller<br>NOAA Fisheries, NEFSC<br> 2022-03-23"
 output:
   xaringan::moon_reader:
     self_contained: true
-    css: ["xaringan-themer.css", "slides-style.css"]
+    css: ["xaringan-themer.css", "slides-style_TMB201.css"]
     lib_dir: libs
     nature:
       ratio: '4:3'
@@ -18,6 +18,7 @@ output:
           </div>
         </div>`
 ---
+
 layout: true
 
 .footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
@@ -115,6 +116,7 @@ ysim <- rbinom(length(N), N, mat)
 Y = matrix(ysim, nrow = 20)
 ```
 ]
+
 ---
 
 #Maturity at age model<br>
@@ -169,6 +171,10 @@ mod = MakeADFun(input$data, input$par,
 
 opt = nlminb(mod$par, mod$fn, mod$gr)
 ```
+See 
+* [maturity_0.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_0.R)
+* [maturity_0.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_0.cpp)
+
 ]
 
 ---
@@ -189,9 +195,12 @@ Type dbetabinom(Type x, Type n, Type p, Type phi, int do_log)
   }
 }
 ```
+See 
+* [maturity_bb.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb.R)
+* [maturity_bb.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb.cpp)
 ]
 
-.pull-right[]
+.pull-right[
 ```cpp
 template<class Type>
 Type objective_function<Type>::operator()()
@@ -257,10 +266,16 @@ class: middle
 ```{r, eval = FALSE}
 #fix slope = 0 : constant proportion with age
 input$map$beta = factor(c(1,NA)) 
+mod = MakeADFun(input$data, input$par, map = input$map)
 
 #intercept = slope
 input$map$beta = factor(c(1,1)) 
+mod = MakeADFun(input$data, input$par, map = input$map)
 ```
+See 
+* [maturity_bb_map.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_map.R)
+* [maturity_bb.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb.cpp)
+* [maturity_bb_reg.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_reg.cpp)
 
 ---
 #Derived parameters
@@ -304,33 +319,38 @@ class: middle
 #Estimating Uncertainty<br><br>
 
 Uncertainty estimates can be calculated in several ways with TMB
- * Asymptotic approximation + delta method (TMB::sdreport)
- * Likelihood profiles (TMB::tmbprofile)
+ * Asymptotic approximation + delta method ([TMB::sdreport](https://rdrr.io/cran/TMB/man/sdreport.html))
+ * Likelihood profiles ([TMB::tmbprofile](https://rdrr.io/cran/TMB/man/tmbprofile.html))
 
 ---
 #TMB::sdreport
-#### as.list.sdreport()
+#### [TMB::as.list.sdreport](https://rdrr.io/cran/TMB/man/as.list.sdreport.html) 
 
 ```{r, eval = FALSE}
+mod$sdrep = sdreport(mod)
 logit_mat = as.list(mod$sdrep, "Estimate", report = TRUE)$logit_mat_at_age
 logit_mat.se =as.list(mod$sdrep, "Std. Error", report = TRUE)$logit_mat_at_age
 logit_mat.ci =matrix(logit_mat, 20, 2) + cbind(-qnorm(0.975)*logit_mat.se, qnorm(0.975)*logit_mat.se)
 plot(ages[1,], 1/(1+exp(-logit_mat)), type = 'l', ylim = c(0,1))
 polygon(c(ages[1,],rev(ages[1,])), 1/(1 + exp(-c(logit_mat.ci[,1],rev(logit_mat.ci[,2])))), lty = 2)
 ```
-```{r, echo = FALSE, out.width="60%", fig.align="center"}
+.pull-left[
+```{r, echo = FALSE, out.width="100%", fig.align="center"}
 knitr::include_graphics("static/maturity_at_age.png")
 ```
-
+]
+.pull-right[
+See 
+* [maturity_bb.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb.R)
+]
 
 ---
-# Lkelihood Profiles<br><br>
+# Lkelihood Profiles
 * Does not make the asymptotic normal assumption
-
 * Essentially: Refit model at series of points, doing likelihood ratio tests at each one
+* A goood (but slower) approach that works better when likelihood profile is asymmetric.
 
-* Theory not covered here, but a good approach.
-
+.pull-left[
 * Easy to do in TMB: 
 ```{r, eval = FALSE}
 #profile beta0
@@ -338,11 +358,15 @@ prof <- TMB::tmbprofile(mod, 1)
 plot(prof)
 confint(prof)
 ```
-
-* Then plot(prof) and confint(prof) plot and give 95% range
-
+* plot(prof) and confint(prof) plot and give 95% range
 * This interval may not be symmetic nor finite
-
+* See [maturity_bb.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb.R)
+]
+.pull-right[
+```{r, echo = FALSE, out.width="100%", fig.align="center"}
+knitr::include_graphics("static/log_phi_profile.png")
+```
+]
 ---
 class: middle
 
@@ -389,6 +413,9 @@ opt <- nlminb(mod$par, mod$fn, mod$gr)
 
 y.sim <- mod$simulate()
 ```
+*Note*
+* optimization not necessary for simulation
+* not vectorized like in R
 ]
 
 ---
@@ -398,6 +425,7 @@ class: middle
 
 ---
 # AR(1) random effects
+
 .pull-left[
 ```cpp
 template<class Type>
@@ -453,7 +481,7 @@ Type objective_function<Type>::operator() ()
 ---
 # AR(1) random effects
 .pull-left[
- ```{r, eval = FALSE}
+```{r, eval = FALSE}
 compile("maturity_bb_re.cpp")
 dyn.load(dynlib("maturity_bb_re"))
 
@@ -486,17 +514,22 @@ input$data$max_age = max(ages)
 ```
 ]
 .pull-right[
+Use TMB to simulate!
 ```{r eval = FALSE}
 mod = MakeADFun(input$data, input$par, random = "re", DLL = "maturity_bb_re")
 input$data = mod$simulate(complete=TRUE)
 mod = MakeADFun(input$data, input$par, random = "re", DLL = "maturity_bb_re")
 opt = nlminb(mod$par, mod$fn, mod$gr)
 ```
+See
+* [maturity_bb_re.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re.R)
+* [maturity_bb_re.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re.cpp)
 ]
 
 ---
 # AR(1) random effects
 * TMB has multivariate normal distributions available in density namespace
+* *Note* NEGATIVE log-likelihood is returned
 ```{r, echo = FALSE}
 mat <- rbind(
   c("AR1", "First-order Autoregressive"),
@@ -511,18 +544,73 @@ knitr::kable(as.data.frame(mat))
 ```
 
 ---
+## AR(1) random effects (density namespace)
+
+.pull-left[
+```cpp
+template<class Type>
+Type objective_function<Type>::operator() ()
+{
+  using namespace density;
+  DATA_VECTOR(Y); //number mature
+  DATA_VECTOR(N); //number of mature + not mature
+  DATA_VECTOR(age_obs); //age for each observation
+  DATA_IVECTOR(re_ind); //indicator for random effect for each observation
+  DATA_INTEGER(max_age); //to generate a maturity ogive
+  PARAMETER_VECTOR(beta); //intercept, slope
+  PARAMETER(log_phi);
+  PARAMETER_VECTOR(AR_pars); //AR1 process (2 pars)
+  PARAMETER_VECTOR(re); //annual ar1 process
+  Type phi = exp(log_phi);
+
+  int n_obs = Y.size();
+  //vector<Type> nll_re(re.size());
+  vector<Type> nll(n_obs);
+  nll.setZero();
+  //nll_re.setZero();
+
+  Type sig_re = exp(AR_pars(0));
+  Type rho_re = -1 + 2/(1+exp(-AR_pars(1)));
+  Type nll_re = SCALE(AR1(rho_re), sig_re)(re); //NEGATIVE log-likelihood returned....
+```
+]
+.pull-right[
+```cpp
+  SIMULATE {
+    AR1(rho_re).simulate(re);
+    re *= sig_re;
+  }
+
+  vector<Type> logit_mat(n_obs), mat(n_obs);
+  for(int i = 0; i < n_obs; i++) {
+    logit_mat(i) = beta(0)  + beta(1)*age_obs(i) + re(re_ind(i)); 
+    mat(i) = 1/(1 + exp(-logit_mat(i)));
+    nll(i) = -dbetabinom(Y(i), N(i), mat(i), phi, 1); //negative log-likelihood
+  }
+  SIMULATE {
+    for(int i = 0; i < n_obs; i++) Y(i) = rbetabinom(N(i), mat(i), phi);
+    REPORT(Y);
+  }
+  return sum(nll) + nll_re;
+}
+```
+See
+* [maturity_bb_re.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re.R)
+* [maturity_bb_re_density.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re_density.cpp)
+]
+---
 class: middle
 
-#Model Validation
+#Model Diagnostics
 
 ---
 
-#Validating the Laplace Approximation
+#Checking the Laplace Approximation
 * For mixed effects models, TMB allows one to test whether the the Laplace approximation of the marginal log-likelihood and joint log-likelihood is ok. 
 $$E \nabla_{\theta} P(X|\theta)= 0$$
 $$E \nabla_{\theta,u} P(X,U|\theta)= 0$$
 * Simulate data and calculate gradients for each simulated data set
-* Average gradient should be 0 when the Laplace approximation is ok
+* Average gradient should be $0$ when the Laplace approximation is ok
 ```{r, eval = FALSE}
 check <- TMB::checkConsistency(mod)
 summary(check)
@@ -530,6 +618,7 @@ summary(check)
 * performs $\chi^2$ test for gradient bias for marginal and joint
 * provides estimates of bias for fixed effects parameters
 * increasing sample sizes will increase power of $\chi^2$ test for (small) bias 
+* See [maturity_bb_re.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re.R)
 ---
 
 # Quantile Residuals<br>
@@ -546,7 +635,7 @@ $F(Y,\Theta)$: cdf of $f(Y,\Theta)$
 
 * These residuals are independent standard normal when the model is appropriate for the data
 
-* For non-random effects models these are equivalent to more familiar quantile residuals used with GLMS because
+* For non-random effects models these are equivalent to more familiar quantile residuals used with GLMs because
 $F(Y_{i}|Y_{1},\ldots, Y_{i-1},\Theta) = F(Y_{i}|\Theta)$
 
 ]
@@ -570,7 +659,8 @@ knitr::kable(as.data.frame(mat))
 
 ```
 * The cdf and oneStepGeneric methods are the only methods available for discrete data: randomized quantile residuals
-* OSA residuals are challenging for some distributions (eg. delta-lognormal, tweedie)
+* oneStepGeneric is dependent on Laplace approximations of likelihoods, so probably important to use TMB::checkConsistency.
+* OSA residuals are challenging for some distributions (eg. delta-lognormal, tweedie). 
 
 ---
 # Implementing OSA in TMB<br>

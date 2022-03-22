@@ -1,9 +1,8 @@
 library(TMB)
 #precompile()
-setwd("maturity_examples")
-dyn.unload(dynlib("maturity_bb_re"))
-compile("maturity_bb_re.cpp")
-dyn.load(dynlib("maturity_bb_re"))
+dyn.unload(dynlib("maturity_examples/maturity_bb_re"))
+compile("maturity_examples/maturity_bb_re.cpp")
+dyn.load(dynlib("maturity_examples/maturity_bb_re"))
 
 a50 = 5
 slope = 0.5
@@ -46,7 +45,7 @@ mod$env$parList()$re
 input$data$re
 
 #check Laplace Approximation
-check = checkConsistency(mod)
+check <- checkConsistency(mod)
 summary(check)
 
 #profile for AR1 sigma parameter (not good)
@@ -60,9 +59,9 @@ as.list(mod$sdrep, what = "Estimate", report=TRUE)$a50
 #need a nonlinear function of the parameters?
 
 #instead use namespace density (multivariate normal NEGATIVE log-likelihoods)
-dyn.unload(dynlib("maturity_bb_re_density"))
-compile("maturity_bb_re_density.cpp")
-dyn.load(dynlib("maturity_bb_re_density"))
+dyn.unload(dynlib("maturity_examples/maturity_bb_re_density"))
+compile("maturity_examples/maturity_bb_re_density.cpp")
+dyn.load(dynlib("maturity_examples/maturity_bb_re_density"))
 
 mod = MakeADFun(input$data, input$par, random = "re", DLL = "maturity_bb_re_density")
 
@@ -83,10 +82,10 @@ for(i in 1:3){
 }
 max(abs(mod$gr(opt2$par)))
 
-
-dyn.unload(dynlib("maturity_bb_re_osa"))
-compile("maturity_bb_re_osa.cpp")
-dyn.load(dynlib("maturity_bb_re_osa"))
+#random effects model with One-Step-Ahead quantile residuals implemented.
+dyn.unload(dynlib("maturity_examples/maturity_bb_re_osa"))
+compile("maturity_examples/maturity_bb_re_osa.cpp")
+dyn.load(dynlib("maturity_examples/maturity_bb_re_osa"))
 
 inputosa = input
 #inputosa$par = mod$env$parList()

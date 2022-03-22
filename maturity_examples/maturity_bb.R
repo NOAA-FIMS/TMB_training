@@ -1,9 +1,9 @@
 library(TMB)
 #precompile()
 
-dyn.unload(dynlib("maturity_bb"))
-compile("maturity_bb.cpp")
-dyn.load(dynlib("maturity_bb"))
+dyn.unload(dynlib("maturity_examples/maturity_bb"))
+compile("maturity_examples/maturity_bb.cpp")
+dyn.load(dynlib("maturity_examples/maturity_bb"))
 
 a50 = 5
 slope = 2
@@ -36,3 +36,12 @@ logit_mat.se =as.list(mod$sdrep, "Std. Error", report = TRUE)$logit_mat_at_age
 logit_mat.ci =matrix(logit_mat, 20, 2) + cbind(-qnorm(0.975)*logit_mat.se, qnorm(0.975)*logit_mat.se)
 plot(ages[1,], 1/(1+exp(-logit_mat)), type = 'l', ylim = c(0,1))
 polygon(c(ages[1,],rev(ages[1,])), 1/(1 + exp(-c(logit_mat.ci[,1],rev(logit_mat.ci[,2])))), lty = 2)
+
+log_phi_profile = TMB::tmbprofile(mod, 3)
+plot(log_phi_profile)
+#for phi instead of log_phi
+phi_profile= log_phi_profile
+phi_profile[,1] = exp(phi_profile[,1]) 
+colnames(phi_profile)[1] = "phi"
+plot(log_phi_profile)
+plot(phi_profile)
