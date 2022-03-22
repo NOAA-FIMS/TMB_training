@@ -12,9 +12,9 @@ phi = 0.1 #as -> Inf betabin -> binomial
 ages = t(matrix(1:20, 20, 40))
 mat = 1/(1+exp(-(beta[1] + beta[2]*ages)))
 set.seed(123)
-N = matrix(sample(50:100, length(ages),replace=TRUE), nrow = 20)
+N = matrix(sample(50:100, length(ages),replace=TRUE), 40,20)
 mat_bb = rbeta(length(N),mat*phi, (1-mat)*phi)
-Y_bb = matrix(rbinom(length(N), N, mat_bb), nrow = 20)
+Y_bb = matrix(rbinom(length(N), N, mat_bb), 40,20)
 
 
 input = list(data=list(),par=list())
