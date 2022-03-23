@@ -209,9 +209,8 @@ $$Var(\lambda) = \frac{\lambda}{n}$$
 ---
 #Multivariate asymptotics
 
-* For N-d models, the shape is represented by a NxN **Hessian** matrix of 2nd partial derivatives
+* For N-d models, the curvature is represented by a NxN **Hessian** matrix of 2nd partial derivatives
 * Inverting the negative Hessian gives us a covariance matrix
-* Same intution about "steepness"
 
 \begin{align}
 (\mathbb{H}_{f})_{i,j} &= \frac{\partial^2f}{\partial \theta_{i}, \partial x\theta_{j}} = \frac{-1}{Var(\Theta)}
@@ -225,22 +224,7 @@ $$Var(\lambda) = \frac{\lambda}{n}$$
 ![](static/mvn2.png)
 ]
 ---
-#Asymptotics in TMB<br><br>
 
-* Hessian is hard to calculate
-* TMB uses AD 
-```{r, eval = FALSE}
-mod$he
-```
-* This can be accessed with:
-```{r, eval = FALSE}
-summary(sdreport(mod), 'fixed')
-fit.cov <- sdreport(mod)$cov.fixed
-ses <- sqrt(diag(fit.cov))
-```
-
-* Under these assumptions we create a confidence interval as MLE +/- 1.96*SE
----
 
 class: middle
 
@@ -255,7 +239,7 @@ class: middle
 3. Construct the C++ objective function with derivatives
 3. Pass the following to a R minimizer:
  * objective function: specified by user in C++
- * initial parameters: specified by user in R
+ * initial parameters and data: specified by user in R
  * gradient functions: calculated by TMB based on objective function
 4. At each step of minimization:
  * Parameter values are updated
@@ -345,8 +329,7 @@ TMB code
 DATA_VECTOR(y); 
 DATA_MATRIX(X); 
 DATA_INTEGER(i); 
-DATA_FACTOR(ngroup1); 
-DATA_FACTOR(ngroup2); 
+DATA_FACTOR(ngroup);  
 
 ```
 ]
@@ -358,9 +341,7 @@ Data <- list(
   y = c(30.2, 45.3, 12.1),
   X = matrix(0,3,3),
   i = 11,
-  ngroup1 = c(1,1,2,2,2),
-  #ngroup can also be a string vector
-  ngroup2 = c('A', 'A', 'B', 'B', 'B')
+  ngroup1 = c(1,1,2,2,2)
 )
 str(Data)
 ```
@@ -370,7 +351,7 @@ str(Data)
 
 ---
 # Declaring model parameters<br><br>
-* No integer parameters allowed
+* No PARAMETER_INTEGER
 * Again, do not specify the object dimension
 <br><br>
 ```{r echo = FALSE, results = 'asis'}

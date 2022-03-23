@@ -191,9 +191,8 @@ Evaluated at the MLE:
 ---
 #Multivariate asymptotics
 
-* For N-d models, the shape is represented by a NxN **Hessian** matrix of 2nd partial derivatives
+* For N-d models, the curvature is represented by a NxN **Hessian** matrix of 2nd partial derivatives
 * Inverting the negative Hessian gives us a covariance matrix
-* Same intution about &quot;steepness&quot;
 
 `\begin{align}
 (\mathbb{H}_{f})_{i,j} &amp;= \frac{\partial^2f}{\partial \theta_{i}, \partial x\theta_{j}} = \frac{-1}{Var(\Theta)}
@@ -207,24 +206,7 @@ Evaluated at the MLE:
 ![](data:image/png;base64,#static/mvn2.png)
 ]
 ---
-#Asymptotics in TMB&lt;br&gt;&lt;br&gt;
 
-* Hessian is hard to calculate
-* TMB uses AD 
-
-```r
-mod$he
-```
-* This can be accessed with:
-
-```r
-summary(sdreport(mod), &#39;fixed&#39;)
-fit.cov &lt;- sdreport(mod)$cov.fixed
-ses &lt;- sqrt(diag(fit.cov))
-```
-
-* Under these assumptions we create a confidence interval as MLE +/- 1.96*SE
----
 
 class: middle
 
@@ -239,7 +221,7 @@ class: middle
 3. Construct the C++ objective function with derivatives
 3. Pass the following to a R minimizer:
  * objective function: specified by user in C++
- * initial parameters: specified by user in R
+ * initial parameters and data: specified by user in R
  * gradient functions: calculated by TMB based on objective function
 4. At each step of minimization:
  * Parameter values are updated
@@ -323,8 +305,7 @@ TMB code
 DATA_VECTOR(y); 
 DATA_MATRIX(X); 
 DATA_INTEGER(i); 
-DATA_FACTOR(ngroup1); 
-DATA_FACTOR(ngroup2); 
+DATA_FACTOR(ngroup);  
 
 ```
 ]
@@ -337,20 +318,17 @@ Data &lt;- list(
   y = c(30.2, 45.3, 12.1),
   X = matrix(0,3,3),
   i = 11,
-  ngroup1 = c(1,1,2,2,2),
-  #ngroup can also be a string vector
-  ngroup2 = c(&#39;A&#39;, &#39;A&#39;, &#39;B&#39;, &#39;B&#39;, &#39;B&#39;)
+  ngroup1 = c(1,1,2,2,2)
 )
 str(Data)
 ```
 
 ```
-## List of 5
+## List of 4
 ##  $ y      : num [1:3] 30.2 45.3 12.1
 ##  $ X      : num [1:3, 1:3] 0 0 0 0 0 0 0 0 0
 ##  $ i      : num 11
 ##  $ ngroup1: num [1:5] 1 1 2 2 2
-##  $ ngroup2: chr [1:5] &quot;A&quot; &quot;A&quot; &quot;B&quot; &quot;B&quot; ...
 ```
 ]
 
@@ -358,7 +336,7 @@ str(Data)
 
 ---
 # Declaring model parameters&lt;br&gt;&lt;br&gt;
-* No integer parameters allowed
+* No PARAMETER_INTEGER
 * Again, do not specify the object dimension
 &lt;br&gt;&lt;br&gt;
 
