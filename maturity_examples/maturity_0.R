@@ -11,8 +11,8 @@ beta = c(-slope*a50,slope)
 ages = t(matrix(1:20, 20, 40))
 mat = 1/(1+exp(-(beta[1] + beta[2]*ages)))
 set.seed(123)
-N = matrix(sample(50:100, length(ages),replace=TRUE), nrow = 20)
-Y = matrix(rbinom(length(N), N, mat), nrow = 20)
+N = matrix(sample(5:10, length(ages),replace=TRUE), 40, 20)
+Y = matrix(rbinom(length(N), N, mat), 40, 20)
 
 
 input = list(data=list(),par=list())
@@ -28,6 +28,7 @@ opt = nlminb(mod$par, mod$fn, mod$gr)
 mod$rep = mod$report()
 mod$sdrep = sdreport(mod)
 summary(mod$sdrep)
+
 logit_mat = as.list(mod$sdrep, "Estimate", report = TRUE)$logit_mat_at_age
 logit_mat.se =as.list(mod$sdrep, "Std. Error", report = TRUE)$logit_mat_at_age
 logit_mat.ci =matrix(logit_mat, 20, 2) + cbind(-qnorm(0.975)*logit_mat.se, qnorm(0.975)*logit_mat.se)

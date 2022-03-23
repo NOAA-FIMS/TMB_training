@@ -24,7 +24,7 @@ Type objective_function<Type>::operator() ()
   }
 
 
-  vector<Type> logit_mat_at_age(max_age);//, mat_at_age(max_age);
+  vector<Type> logit_mat_at_age(max_age);
   for(int i = 0; i < max_age; i++) logit_mat_at_age(i) = beta(0)  + beta(1)*Type(i+1);
   vector<Type> mat_at_age = 1/(1+ exp(-logit_mat_at_age));
   Type a50 = -beta(0)/beta(1);
