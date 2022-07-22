@@ -44,7 +44,7 @@ options(htmltools.dir.version = FALSE)
 # this gives you a tile navigation if you type "O" at any time
 xaringanExtra::use_tile_view()
 ```
-
+<!-- modified from Cole Monnahan's TMB training series:  https://github.com/colemonnahan/tmb_workshop-->
 
 ---
 # What is TMB?
@@ -755,7 +755,7 @@ Type objective_function<Type>::operator()()
 Run Model:
 ```{r}
 library(TMB)
-#compile("../src/simple_")
+#compile("src/simple_re.cpp")
 dyn.load(dynlib("../src/simple_re"))
 obj <- MakeADFun(
   data=list(y=y, B=B, X=X),
