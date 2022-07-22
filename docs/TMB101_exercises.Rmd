@@ -1,0 +1,167 @@
+---
+title:  "TMB 101 Exercises"
+subtitle: "FIMS Implementation Team Workshop"
+author: "Andrea Havron<br>NOAA Fisheries, OST<br> 2022-03-23"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: ["xaringan-themer.css", "slides-style.css"]
+    lib_dir: libs
+    nature:
+      ratio: '4:3'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc( (%current% - 1) / (%total% - 1) * 100%);">
+          </div>
+        </div>`
+---
+layout: true
+
+.footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
+
+
+<style type="text/css">
+
+code.cpp{
+  font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-tile-view, echo=FALSE}
+# this gives you a tile navigation if you type "O" at any time
+xaringanExtra::use_tile_view()
+```
+
+---
+#Maturity at age model<br>
+The number of mature fish, $C_{y,a}$ out of the total number of fish, $N_{y,a}$ at year, $y$ and age, $a$, can be expressed as a binomial distribution,
+
+$$C_{y,a} \sim Binom(N_{y,a}, p^{M}_{y,a})$$,
+
+where $p^{M}$ represents the probability of maturity, which can be expressed as a logistic transformation of a slope parameter and $a_{50}$, the age of 50% maturity,
+
+\begin{align}
+\beta &= c(-slope*a50, slope)\\
+\eta_{y,a} &= \beta_{0} + \beta_{1}*a\\
+p^{M}_{y,a} &= \frac{1}{1+exp(-\eta_{y,a})}
+\end{align}
+
+---
+#Maturity at age model<br>
+
+.pull-left[
+```cpp
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(Y);
+  DATA_VECTOR(N);
+  DATA_VECTOR(age_obs); 
+  DATA_INTEGER(max_age); 
+  PARAMETER_VECTOR(beta); 
+
+  int n_obs = Y.size();
+  vector<Type> nll(n_obs);
+  nll.setZero();
+     
+  vector<Type> logit_mat(n_obs);
+  vector<Type> mat(n_obs);
+  for(int i = 0; i < n_obs; i++) {
+    logit_mat(i) = beta(0) + 
+       beta(1)*age_obs(i); 
+    mat(i) = 1/(1 + exp(-logit_mat(i)));
+    nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  }
+
+  return sum(nll);
+}
+```
+]
+
+.pull-right[
+Simulate data
+```{r, eval = FALSE}
+a50 = 5
+slope = 2
+beta = c(-slope*a50,slope)
+ages = t(matrix(1:20, 20, 40))
+mat = 1/(1+exp(-(beta[1] + beta[2]*ages)))
+set.seed(123)
+samp <- sample(50:100, length(ages),
+               replace=TRUE)
+N = matrix(samp, nrow = 20)
+ysim <- rbinom(length(N), N, mat)
+Y = matrix(ysim, nrow = 20)
+```
+]
+---
+
+#Maturity at age model<br>
+
+.pull-left[
+```cpp
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(Y);
+  DATA_VECTOR(N);
+  DATA_VECTOR(age_obs); 
+  DATA_INTEGER(max_age); 
+  PARAMETER_VECTOR(beta); 
+
+  int n_obs = Y.size();
+  vector<Type> nll(n_obs);
+  nll.setZero();
+     
+  vector<Type> logit_mat(n_obs);
+  vector<Type> mat(n_obs);
+  for(int i = 0; i < n_obs; i++) {
+    logit_mat(i) = beta(0) + 
+       beta(1)*age_obs(i); 
+    mat(i) = 1/(1 + exp(-logit_mat(i)));
+    nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  }
+
+  return sum(nll);
+}
+```
+]
+
+.pull-right[
+Run model
+```{r, eval = FALSE}
+library(TMB)
+compile("maturity_0.cpp")
+dyn.load(dynlib("maturity_0"))
+
+input = list(data=list(),par=list())
+input$par$beta = c(0,0)
+input$data$Y = c(Y)
+input$data$N = c(N)
+input$data$age_obs = c(ages)
+input$data$max_age = max(ages)
+
+mod = MakeADFun(input$data, input$par, 
+                DLL = "maturity_0")
+
+opt = nlminb(mod$par, mod$fn, mod$gr)
+```
+]
+
