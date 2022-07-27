@@ -42,4 +42,5 @@ vignettes/*.pdf
 *.dll
 *.o
 *.so
+*.exe
 .Rproj.user
