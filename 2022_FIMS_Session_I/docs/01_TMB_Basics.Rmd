@@ -1,0 +1,302 @@
+---
+title:  "TMB Basics"
+subtitle: "FIMS Training Session I"
+author: "Andrea Havron<br>NOAA Fisheries, OST"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: ["xaringan-themer.css", "slides-style.css"]
+    lib_dir: libs
+    nature:
+      ratio: '16:9'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc( (%current% - 1) / (%total% - 1) * 100%);">
+          </div>
+        </div>`
+---
+layout: true
+
+.footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
+
+
+<style type="text/css">
+
+code.cpp{
+  font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-tile-view, echo=FALSE}
+# this gives you a tile navigation if you type "O" at any time
+xaringanExtra::use_tile_view()
+```
+<!-- modified from Cole Monnahan's TMB training series:  https://github.com/colemonnahan/tmb_workshop-->
+
+
+---
+
+
+class: middle
+
+# Maximum Likelihood Inference with TMB
+
+---
+
+# ML with TMB:
+<br><br>
+1. Write C++ model to specify the negative log-likelihood for a set of parameters and data
+2. Compile the model and link to R
+3. Construct the C++ objective function with derivatives
+3. Pass the following to a R minimizer:
+ * objective function: specified by user in C++
+ * initial parameters and data: specified by user in R
+ * gradient functions: calculated by TMB based on objective function
+4. At each step of minimization:
+ * Parameter values are updated
+ * The negative log-likelihood is calculated
+ * The gradient functions return the gradients (vector of derivatives) based on the new parameter values
+5. Model convergence is reached when:
+ * The gradients are near zero
+ * The negative log-likelihood is at a minimum
+
+---
+
+# TMB Model
+
+
+.pull-left[
+linReg.cpp
+
+```cpp
+// Simple linear regression
+#include <TMB.hpp>
+template <class Type>
+  
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(y);
+  DATA_MATRIX(X);
+  PARAMETER_VECTOR(beta);
+  PARAMETER(lnSigma);
+  
+  Type nll = 0;
+  Type sigma = exp(lnSigma);
+  int n = y.size();
+  vector<Type> mu = X * beta;
+  for(int i=0; i<n; i++){
+    nll -= dnorm(y(i), mu(i), sigma, true);
+  }
+  
+  Type sig2 = pow(sigma,2);
+  REPORT(sig2);
+  ADREPORT(sig2);
+  
+  return nll;
+}
+```
+]
+
+.pull-right[
+**C++ preliminaries**
+* Lines end in semi-colons
+* Everything must be declared
+* Type is generic and assigned based on input
+* Indexing starts at 0!
+* x -= 1: x = x-1
+* Math operators similar to R (+,-,/,*) 
+* Use pow(x,p) for x^p
+* if statements cannot be based on a parameter
+]
+
+
+
+---
+# Data: Importing data from R<br><br>
+* Pass data to TMB with these 'macros'
+* Note: do not specify the object dimension
+<br><br>
+```{r echo = FALSE, results = 'asis'}
+library(knitr)
+df <- as.data.frame(
+  rbind(
+    c('DATA_VECTOR(x)',	'vector<Type>',	'vector'),
+    c('DATA_MATRIX(x)','	matrix<Type>',	'matrix'),
+    c('DATA_SCALAR(x)',	'Type',	'numeric(1)'),
+    c('DATA_INTEGER(x)',	'int',	'integer(1)'),
+    c('DATA_FACTOR(x)',	'vector<int>',	'factor'),
+    c('DATA_ARRAY(x)'	,'array<Type>',	'array')
+  )
+)
+colnames(df) <- c('TMB Syntax' , 'C++ Type' , 'R Type')
+kable(df)
+```
+---
+# Data: Importing data from R<br><br>
+
+.pull-left-narrow[
+TMB code
+```cpp
+DATA_VECTOR(y); 
+DATA_MATRIX(X); 
+DATA_INTEGER(i); 
+DATA_FACTOR(ngroup);  
+
+```
+]
+
+.pull-right-wide[
+R script
+```{r}
+Data <- list(
+  y = c(30.2, 45.3, 12.1),
+  X = matrix(0,3,3),
+  i = 11,
+  ngroup1 = c(1,1,2,2,2)
+)
+str(Data)
+```
+]
+
+
+
+---
+# Declaring model parameters<br><br>
+* No PARAMETER_INTEGER
+* Again, do not specify the object dimension
+<br><br>
+```{r echo = FALSE, results = 'asis'}
+library(knitr)
+df <- as.data.frame(
+  rbind(
+    c('PARAMETER_VECTOR(x)',	'vector<Type>',	'vector'),
+    c('PARAMETER_MATRIX(x)','	matrix<Type>',	'matrix'),
+    c('PARAMETER_ARRAY(x)'	,'array<Type>',	'array'),
+    c('PARAMETER(x)'	,'Type',	'numeric(1)')
+  )
+)
+colnames(df) <- c('TMB Syntax' , 'C++ Type' , 'R Type')
+kable(df)
+```
+
+---
+# Declaring model parameters<br><br>
+
+.pull-left-narrow[
+TMB code
+```cpp
+PARAMETER_VECTOR(beta); 
+PARAMETER(ln_sigma); 
+PARAMETER_MATRIX(u); 
+```
+]
+
+.pull-right-wide[
+R script
+```{r}
+Pars <- list(
+   beta = c(0,0),
+   lnSigma = 0,
+   u = matrix(0,3,3) 
+)
+
+str(Pars) 
+```
+]
+
+
+---
+#Building a TMB model in R<br><br>
+
+* All C++ models, including TMB, need to be compiled
+  * In TMB, this creates a dynamic link library (.dll)
+  * The .dll file needs to be loaded for R to access
+```{r}
+library(TMB)
+compile('../src/linReg.cpp')
+dyn.load(dynlib('../src/linReg'))
+```
+
+---
+#Building a TMB model in R<br>
+
+* TMB additionally needs to build a computational graph
+  * This sets up derivative chain used to determine the gradiant functions
+  * TMB has a static graph, so this step happens before optimization
+  * The R function, MakeADFun() completes this step
+```{r}
+#Simulate data 
+set.seed(123)
+Data <- list(y = rnorm(10) + 1:10, 
+             X=cbind(rep(1,10),1:10))
+obj <- MakeADFun(data = Data, 
+                 parameters = list(beta = c(0,0),lnSigma = 0), 
+                 DLL = 'linReg')
+```
+MakeADFun output:
+* **par**: initial values
+* **fn**: the likelihood function
+* **gr**: the gradient function
+* **report**: return values wrapped in REPORT()
+* **env**: environment with access to all parts of structure
+
+---
+
+#Building a TMB model in R<br>
+* The model is optimized outside of TMB using any R minimizer
+* nlminb is a base R minimizer frequently used for TMB models
+```{r, echo = TRUE, results = "hide"}
+# Pass initial values, function, and gradient functions
+opt <- nlminb(obj$par, obj$fn, obj$gr)
+```
+Report objects back to R
+```{r}
+report <- obj$report()
+report$sig2
+```
+nlminb output:
+* **par**: MLEs
+* **objective**: the nll associated with the MLEs
+* **convergence**: 0 indicates successful convergence
+* **message**: convergence message
+* **iterations**: number of iterations
+* **evaluations**: number of objective and gradient function evaluations
+---
+# Check model convergence
+
+```{r}
+#Check maximum gradient < 0.0001
+obj$gr()
+#Check convergence error = 0
+opt$convergence
+#Check convergence message
+opt$message
+```
+---
+# Uncertainty 
+
+```{r, echo = TRUE, results = 'hide'}
+sdr <- sdreport(obj)
+```
+```{r}
+#uses the Hessian to calculate parameter uncertainty
+summary(sdr, "fixed")
+#uses the Delta method to calculate undertainty for derived quantities
+summary(sdr, "report")
+
+#Check Hessian is positive definite
+sdr$pdHess
+```
