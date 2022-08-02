@@ -1,10 +1,10 @@
 require(TMB)
-dyn.load(dynlib("src/simple_re"))
+dyn.load(dynlib("2022_FIMS_Session_I/src/simple_re"))
 
 ## Test data
 set.seed(123)
 yr <- rep(1900:2010,each=2)
-yrear <- factor(yr)
+year <- factor(yr)
 quarter <- factor(rep(1:4,length.out=length(year)))
 period <- factor((yr > mean(yr))+1)
 ## Random year+quarter effect, fixed period effect:
