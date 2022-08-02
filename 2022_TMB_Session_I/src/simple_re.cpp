@@ -11,11 +11,11 @@ Type objective_function<Type>::operator() ()
   PARAMETER_VECTOR(u);    
   PARAMETER_VECTOR(beta); 
   PARAMETER(lnSDu);      
-  PARAMETER(lnSDy);    
+  PARAMETER(lnSDy);   
 
   Type nll = 0;
   Type sdu = exp(lnSDu);
-  nll -= dnorm(u, Type(0), sdu, true).sum();
+  nll -= sum(dnorm(u, Type(0), sdu, true));
 
   vector<Type> mu = X * beta + B * u;
   Type sdy = exp(lnSDy);

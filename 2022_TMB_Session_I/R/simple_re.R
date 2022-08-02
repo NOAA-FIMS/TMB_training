@@ -26,4 +26,5 @@ obj <- MakeADFun(data=list(y=y, B=B, X=X),
                  silent=TRUE
                  )
 opt <- nlminb(obj$par, obj$fn, obj$gr)
-
+opt$par
+beta
