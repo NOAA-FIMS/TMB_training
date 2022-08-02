@@ -7,8 +7,8 @@
 #-----------------------------------------------------------
 
 library(TMB)
-compile('2022_FIMS_Session_I/src/linReg.cpp')
-dyn.load(dynlib('2022_FIMS_Session_I/src/linReg'))
+compile('2022_TMB_Session_I/src/linReg.cpp')
+dyn.load(dynlib('2022_TMB_Session_I/src/linReg'))
 
 
 #------------------------------------------------------------------------

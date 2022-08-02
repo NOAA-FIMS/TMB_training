@@ -1,5 +1,6 @@
 require(TMB)
-dyn.load(dynlib("2022_FIMS_Session_I/src/simple_re"))
+compile("2022_TMB_Session_I/src/simple_re.cpp")
+dyn.load(dynlib("2022_TMB_Session_I/src/simple_re"))
 
 ## Test data
 set.seed(123)
@@ -25,3 +26,4 @@ obj <- MakeADFun(data=list(y=y, B=B, X=X),
                  silent=TRUE
                  )
 opt <- nlminb(obj$par, obj$fn, obj$gr)
+

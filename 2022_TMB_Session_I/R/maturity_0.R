@@ -1,7 +1,7 @@
 library(TMB)
 
-compile("2022_FIMS_Session_I/src/maturity_0.cpp")
-dyn.load(dynlib("2022_FIMS_Session_I/src/maturity_0"))
+compile("2022_TMB_Session_I/src/maturity_0.cpp")
+dyn.load(dynlib("2022_TMB_Session_I/src/maturity_0"))
 
 a50 = 5
 slope = 2
@@ -36,12 +36,12 @@ polygon(c(ages[1,],rev(ages[1,])), 1/(1 + exp(-c(logit_mat.ci[,1],rev(logit_mat.
   
 ## Map parameters
 input$map$beta = factor(c(1,NA)) 
-mod = MakeADFun(input$data, input$par, map = input$map)
+mod = MakeADFun(input$data, input$par, map = input$map,  DLL = "maturity_0")
 opt = nlminb(mod$par, mod$fn, mod$gr)
 opt$par
 
 #intercept = slope
 input$map$beta = factor(c(1,1)) 
-mod = MakeADFun(input$data, input$par, map = input$map)
+mod = MakeADFun(input$data, input$par, map = input$map,  DLL = "maturity_0")
 opt = nlminb(mod$par, mod$fn, mod$gr)
 opt$par
