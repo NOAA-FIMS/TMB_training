@@ -52,70 +52,6 @@ code.r{
 5. Validation errors
 ]
 ---
-#Maturity at age model&lt;br&gt;
-The number of mature fish, `\(Y_{y,a}\)` out of the total number of fish, `\(N_{y,a}\)` at year, `\(y\)` and age, `\(a\)`, can be expressed as a binomial distribution,
-
-`$$Y_{y,a} \sim Binom(N_{y,a}, p_{y,a})$$`,
-
-where `\(p\)` represents the probability of maturity. Common to estimate maturity using logistic regression: 
-
-`$$log\left(\frac{p_{y,a}}{1-p_{y,a}}\right) = \eta_{y,a} = \beta_0 + \beta_1 a$$`
-
-The age of 50% maturity is `\(a_{50} = -\frac{\beta_0}{\beta_1}\)`,
-
----
-
-#Overdispersed model&lt;br&gt;
-.pull-left[
-```cpp
-#include &lt;TMB.hpp&gt;
-template&lt;class Type&gt;
-Type dbetabinom(Type x, Type n, Type p, Type phi, int do_log)
-{
-  Type ll = lgamma(n + 1.0) - lgamma(x + 1.0) - lgamma(n - x + 1.0) + 
-    lgamma(x + p*phi) + lgamma(n - x +(1-p)*phi) - lgamma(n + phi) +
-    lgamma(phi) - lgamma(p*phi) - lgamma((1-p)*phi);
-  if(do_log) return(ll);
-  else {
-    return(exp(ll));  
-  }
-}
-```
-See 
-* [maturity_bb.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb.R)
-* [maturity_bb.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb.cpp)
-]
-
-.pull-right[
-```cpp
-template&lt;class Type&gt;
-Type objective_function&lt;Type&gt;::operator()()
-{
-  DATA_VECTOR(Y); //number mature
-  DATA_VECTOR(N); //number of mature + not mature
-  DATA_VECTOR(age_obs); //age for each observation
-  DATA_INTEGER(max_age); //to generate a maturity ogive
-  PARAMETER_VECTOR(beta); //intercept, slope
-  PARAMETER(log_phi);
-  Type phi = exp(log_phi);
-
-  int n_obs = Y.size();
-  vector&lt;Type&gt; nll(n_obs);
-  nll.setZero();
-     
-  vector&lt;Type&gt; logit_mat(n_obs), mat(n_obs);
-  for(int i = 0; i &lt; n_obs; i++) {
-    logit_mat(i) = beta(0)  + beta(1)*age_obs(i); 
-    mat(i) = 1/(1 + exp(-logit_mat(i)));
-    nll(i) = -dbetabinom(Y(i), N(i), mat(i), phi, 1); //negative log-likelihood
-  }
-
-  return sum(nll);
-}
-```
-]
-
----
 
 # Debugging: Error types&lt;br&gt;
 .pull-left[
@@ -179,13 +115,15 @@ return nll;
 linReg.R
 
 ```r
+setwd(&quot;2022_TMB_Session_I&quot;)
+
 #compilation flags when using gdbsource
 
 #On Linus/OS X
-TMB::compile(&quot;src/linReg.cpp&quot;,&quot;-O0 -g&quot;)
+TMB::compile(&quot;src/debug1.cpp&quot;,&quot;-O0 -g&quot;)
 
 #On Windows
-TMB::compile(&quot;src/linReg.cpp&quot;,&quot;-O1 -g&quot;,
+TMB::compile(&quot;src/debug1.cpp&quot;,&quot;-O1 -g&quot;,
              DLLFLAGS=&quot;&quot;)
 ```
 ]
@@ -196,14 +134,14 @@ Console
 ```r
 #Debug using RStudio:
 &gt; TMB:::setupRStudio()
-&gt; TMB::compile(&quot;src/linReg.cpp&quot;)
+&gt; TMB::compile(&quot;src/debug1.cpp&quot;)
 
 #Debug using gdbsource
 #hangs on Windows
-&gt; TMB::gdbsource(&quot;R/linReg.R&quot;)
+&gt; TMB::gdbsource(&quot;R/debug_gdbsource.R&quot;)
 #works on Windows but not always 
 #informative
-&gt; TMB::gdbsource(&quot;R/linReg.R&quot;, 
+&gt; TMB::gdbsource(&quot;R/debug_gdbsource.R&quot;, 
                  interactive = TRUE)
 ```
 ]
@@ -250,7 +188,7 @@ linReg.R
 library(TMB)
 compile(linReg.cpp)
 Data &lt;- list(y = c(-2.1, 3.3, 4.2),
-             X = data.frame(c(1,1),c(4,5))
+             X = data.frame(c(1,1),c(4,5)))
 Pars &lt;- list(beta = 0)
 obj &lt;- MakeADFun(data = Data, 
                  parameters = Pars, 
@@ -278,16 +216,17 @@ Model fails during minimization
 ]
 
 .pull-left[
-linReg.cpp
+debug2.cpp
 ```cpp
 DATA_VECTOR(y);
 DATA_MATRIX(X);
 
 PARAMETER_VECTOR(beta);
-PARAMETER(sigma);
+PARAMETER(lnSigma);
 
 Type nll = 0;
-vector&lt;Type&gt; mu = log(X*beta);
+Type sigma = exp(lnSigma);
+vector&lt;Type&gt; mu = X*beta;
 nll -= sum(dlnorm(y,mu,sigma));
 return nll;
 ```
@@ -298,10 +237,10 @@ simple.R
 
 ```r
 library(TMB)
-compile(linReg.cpp)
-dyn.lib(dynload(&quot;linReg&quot;))
+compile(&quot;debug2.cpp&quot;)
+dyn.lib(dynload(&quot;debug2&quot;))
 Data &lt;- list(y = c(-2.1, 3.3, 4.2),
-             X = cbind(c(1,1,1),c(4,5,2))
+             X = cbind(c(1,1,1),c(4,5,2)))
 Pars &lt;- list(beta = c(0,0), sigma = 0)
 obj &lt;- MakeADFun(data = Data, 
                  parameters = Pars, 
@@ -352,52 +291,7 @@ opt &lt;- nlminb(obj$par, obj$fn, obj$gr)
   * Incorrect random effect structure
 ]
 
----
-# Implementing OSA in TMB&lt;br&gt;
 
-.pull-left[
-```cpp
- #include &lt;TMB.hpp&gt;
-
-template&lt;class Type&gt;
-Type objective_function&lt;Type&gt;::operator() ()
-{
-  DATA_VECTOR(y);         
-  DATA_SPARSE_MATRIX(B);  
-  DATA_SPARSE_MATRIX(X); 
-  DATA_VECTOR_INDICATOR(keep, y); 
-  PARAMETER_VECTOR(u);    
-  PARAMETER_VECTOR(beta); 
-  PARAMETER(lnSDu);      
-  PARAMETER(lnSDy);    
-
-...
-
-  Type nll = 0;
-  Type sdu = exp(lnSDu);
-  nll -= dnorm(u, Type(0), sdu, true).sum();
-
-...
-
-   vector&lt;Type&gt; mu = X * beta + B * u;
-  Type sdy = exp(lnSDy);
-  for(int i=0; i&lt;y.size(); i++){
-    nll -= keep(i) * dnorm(y(i), mu(i), sdy, true);
-  }
-  
-  ...
-  
-  return nll;
-}
-
-
-```
-]
-
-
-* See [src/simple_re.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/src/simple_re.cpp)
-* [maturity_bb_diagnostics.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_diagnostics.R)
-]
 
 
     </textarea>

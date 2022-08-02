@@ -641,6 +641,11 @@ TMB_FIMS_THIRD_ORDER AD<TMB_FIMS_SECOND_ORDER> | AD< AD< AD < double > > >  | $d
 # TMB and FIMS
 [**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g13fa6bc6e99_0_0)
 ```{r, echo = FALSE, out.width="60%", fig.align="left"}
-knitr::include_graphics("static/fims-tmb.png")
+knitr::include_graphics("static/fims-tmb1.png")
 ```
-
+---
+# TMB and FIMS
+[**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g1405a9bb7f8_0_0)
+```{r, echo = FALSE, out.width="80%", fig.align="left"}
+knitr::include_graphics("static/fims-tmb2.png")
+```
