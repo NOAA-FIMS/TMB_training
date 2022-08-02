@@ -21,11 +21,15 @@ Type objective_function<Type>::operator() ()
     logit_mat(i) = beta(0)  + beta(1)*age_obs(i); 
     mat(i) = 1/(1 + exp(-logit_mat(i)));
     nll(i) = -dbinom(Y(i), N(i), mat(i), 1);   //negative log-likelihood
+    SIMULATE{
+      Y(i) = rbinom(N(i), mat(i));
+    }
+  }
+  SIMULATE{
+    REPORT(Y);
   }
   
-  SIMULATE{
-    Y(i) = rbinom(N(i), mat(i));
-  }
+
 
   //derived quantities
   vector<Type> logit_mat_at_age(max_age);
