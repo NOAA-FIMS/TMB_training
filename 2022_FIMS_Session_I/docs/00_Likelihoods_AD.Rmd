@@ -1,6 +1,6 @@
 ---
 title:  "A review of statistical computing with TMB"
-subtitle: "FIMS Training Session I"
+subtitle: "TMB Training Session I"
 author: "Andrea Havron<br>NOAA Fisheries, OST"
 output:
   xaringan::moon_reader:
@@ -52,35 +52,121 @@ xaringanExtra::use_tile_view()
 
 All slides and code are at [NOAA-FIMS/TMB_training](https://github.com/NOAA-FIMS/TMB_training)
 
-
-```{r, echo = FALSE, out.width="60%", fig.align="left"}
+.column-60[
+```{r, echo = FALSE, out.width="100%", fig.align="left"}
 knitr::include_graphics("static/tmb_training_screenshot.png")
 ```
+]
 
+.column-40[
+```{r, echo = FALSE, out.width="60%", fig.align="left"}
+knitr::include_graphics("static/SessionI_screenshot.png")
+```
+]
 ---
-# What is TMB?
-
+# Session I Agenda
 <br>
 
-.p[
-* TMB is an R package and C++ environment for fitting statistical models
-* Models are written in templated C++
-* The TMB R package interfaces between R and C++
-* The TMB engine implements automatic differentiation:
-  - Calculates Up to the 3rd derivative
-  - Parameter values and gradients (derivative vectors) are passed off to an R minimizer
- ] 
+**Day 1**:<br>
+- Review of statistical computing with TMB
+- TMB Basics with Linear Regression live coding example
+- Debugging 
+<br>
+
+**Day 2**:<br>
+- Dealing with parameters
+- Modular TMB with Multinomial live coding example
+- Debugging 
+
  
 ---
-# Overview
+# Statistical Computing Review
 <br>
 
-.large[
+```{r, echo = FALSE, out.width="60%", fig.align="left"}
+knitr::include_graphics("static/TMB-trifecta.png")
+```
+
+
+---
+# What is AD?
+
+.three-column-left[
+**Automatic Differentiation**<br>
+Derivatives calculated automatically using the chain rule<br>
 .p[
-1. Type Systems in R and C++
-2. AD Review
-3. Likelihoods and AD Types
+- Efficient: forward mode, O(n); reverse mode, O(m)
+- Accurate 
+- Higher order derivatives: easy
 ]]
+.three-column-left[
+**Symbolic Differentiation**<br>
+Computer program converts function into exact derivative function<br>
+.p[
+- Inefficient: O(2n) for n input variables
+- Exact 
+- Higher order derivatives: difficult due to complexity
+]]
+.three-column-left[
+**Numerical Differentiation**<br>
+Approximation that relies on finite differences
+.p[
+- Efficient: O(n) 
+- Trade-off between truncation error versus round-off error
+- Higher order derivatives calculation difficult due to error accumulation
+]]
+
+---
+# Computational Graph (Tape)
+<br>
+.three-column-left[
+```{Rcpp, eval = FALSE}
+//Program
+v1: x = ?
+v2: y = ?
+v3: a = x * y
+v4: b = sin(y)
+v5: z = a + b
+```
+]
+.three-column[
+```{r, echo = FALSE, out.width="100%", fig.align="left"}
+knitr::include_graphics("static/comp-graph.png")
+```
+]
+.three-column-left[
+```{Rcpp, eval = FALSE}
+//Reverse Mode
+dz = ?
+da = dz
+db = dz
+dx = yda
+dy = xda + cos(y)db
+```
+]
+
+---
+# Reverse Mode
+.pull-left[
+**Static (TMB: CppAD, TMBad)**<br>
+The graph is constructed once before execution
+.p[
+- Less flexibility with conditional statements that depend on parameters. 
+- Atomic functions can be used when conditional statements depend on parameters
+- High portability 
+- Graph optimization possible
+]]
+
+.pull-right[
+**Dynamic (Stan: Stan Math Library, ADMB: AUTODIF)**<br>
+The graph is defined as forward computation is executed at every iteration
+.p[
+- Flexibility with conditional statements
+- Optimization routine implemented into executable
+- Less time for graph optimization
+]
+]
+
 ---
 
 class: middle
@@ -106,7 +192,7 @@ class: middle
 ]]
 
 ---
-# Type Declaration Example
+# Changing Type Declaration
 <br>
 .pull-left[
 **R: Dynamic**
@@ -115,6 +201,20 @@ a <- 1
 a <- "hello"
 a <- function(x) x^2
 a <- environment()
+```
+
+```{r, echo = FALSE}
+foo <- `+`
+```
+
+```{r}
+`+`  <- `-`
+1 + 1
+```
+
+```{r, echo = FALSE}
+`+` <- foo
+rm(foo)
 ```
 ]
 
@@ -138,8 +238,8 @@ error in engine(options) : lec1a.cpp: In function 'int main()': lec1a.cpp:7:17: 
 ]
 
 ---
-# R and C++ - Type Conversion Example
-
+# Explicit Type Conversion
+<br>
 .pull-left[
 **R: Dynamic**
 ```{r, eval = FALSE}
@@ -149,6 +249,39 @@ a + b
 ```
 Error in a + b : non-numeric argument to binary operator
 
+```{r}
+a <- 1
+b <- "hello"
+c <- as.numeric(as.factor(b))
+a + c
+```
+] 
+
+.pull-right[
+**C++: Static**
+```{Rcpp, eval = FALSE}
+#include <iostream>
+#include <string>
+
+int main() {
+    int x = 1;
+    std::string a = "a";
+    std::string b = std::to_string(x);
+    std::cout << a + b;
+    return 0;
+}
+```
+
+```{bash, eval = FALSE}
+g++ ../src/lec1b.cpp -o b.exe
+b.exe
+```
+a1
+]
+---
+# Implicit Type Conversion
+.pull-left[
+**R: Dynamic**
 ```{r}
 a <- 1
 b <- "hello"
@@ -166,19 +299,15 @@ int main() {
     double x = 1.1;
     int y = x;
     std::cout << "x = " << x << "; y = " << y << std::endl;
-    std::string a = "a";
-    std::string b = std::to_string(y);
-    std::cout << a + b;
     return 0;
 }
 ```
 
 ```{bash, eval = FALSE}
-g++ ../src/lec1b.cpp -o a.exe
-a.exe
+g++ ../src/lec1c.cpp -o c.exe
+c.exe
 ```
-x = 1.1; y = 1 <br>
-a1
+x = 1.1; y = 1 
 ]
 
 
@@ -189,6 +318,38 @@ a1
 * Allows developer to write functions and classes that are independent of Type
 * Templates are expanded at compile time
 
+.pull-left[
+```{Rcpp, eval = FALSE}
+
+template <class T>
+  T add(T x, T y){
+  return x + y;
+}
+
+int main(){
+  int a = 1;
+  int b = 2;
+  double c = 1.1;
+  double d = 2.1;
+  int x = add(a,b);
+  double y = add(c,d);
+}
+
+```
+]
+.pull-right[
+```{Rcpp, eval = FALSE}
+int add(int x, int y){
+  return x + y;
+}
+double add(double x, double y){
+  return x + y;
+}
+```
+]
+
+---
+# Setting up Templated C++
 <br>
 ```{Rcpp, eval = FALSE}
 template <class T>
@@ -204,81 +365,23 @@ Type add(Type x, Type y){
 }
 ```
 
-
 ---
-
-class: middle
-
-# Review of Automatic Differentiation
----
-# What is AD?
-
-- Symbolic differentiation
-  - Converts computer program into single expression
-  - Inefficient code, computationally expensive, O(2n) for n input variables
-  - Higher order derivatives calculation difficult due to complexity
-- Numerical differentiation
-  - Approximation that relies on finite differences, O(n)
-  - Trade-off between truncation error versus round-off error
-  - Higher order derivatives calculation difficult due to error accumulation
-- Automatic Differentiation
-  - Accurate derivatives calculated automatically using the chain rule
-  - Calculates higher order derivatives
-  - Forward mode: O(n) 
-  - Reverse mode: O(m) for m output variables, more complicated to implement algorithmically
-
----
-# Forward Mode
+# TMB AD Systems
 <br>
-
-```{r, echo = FALSE, out.width="70%", fig.align="left"}
-knitr::include_graphics("static/forward-mode.png")
-```
-
----
-# Reverse Mode
-<br>
-
-```{r, echo = FALSE, out.width="70%", fig.align="left"}
-knitr::include_graphics("static/reverse-mode.png")
-```
-
----
-# Reverse Mode
-<br><br>
-- Requires storage of intermediate variables along with computational instructions (‘tape’)
-- Given m output variables:
-  - Time cost of method: O(m)
-  - Memory cost of method: O(#ops)
-- Static and Dynamic computational graphs
-
----
-# Reverse Mode
 .pull-left[
-**Static (cppAD, TMBad)**
-The graph is constructed once before execution
-- Less flexibility with conditional statements that depend on parameters. Atomic functions can be used when conditional statements depend on parameters
-- High portability 
-- Graph optimization possible
-
+**CppAD**
+- [CppAD package](https://coin-or.github.io/CppAD/doc/cppad.htm)
 ]
-
 .pull-right[
-**Dynamic (Stan, ADMB)**
-The graph is defined as forward computation is executed at every iteration
-- Flexibility with conditional statements
-- Optimization routine implemented into executable
-- Less time for graph optimization
-
+**TMBad**<br>
+- TMBad is available with TMB 1.8.0 and higher
 ]
----
-
-class: middle
-
-### Demystifying AD< AD< AD< double> > >
 
 ---
-## From [inst/include/def.hpp](https://github.com/NOAA-FIMS/FIMS/blob/24458ce4cae439dbb4917a013a35cac5cc11b592/inst/include/common/def.hpp#L17)
+# TMB AD Types
+
+**CppAD**<br>
+From [FIMS/inst/include/def.hpp](https://github.com/NOAA-FIMS/FIMS/blob/24458ce4cae439dbb4917a013a35cac5cc11b592/inst/include/common/def.hpp#L17)
 
 ```{Rcpp, eval = FALSE}
 #ifdef TMB_MODEL
@@ -290,25 +393,56 @@ class: middle
 #endif
 ```
 
-def                                            |C++ Type                    |Used to evaluate
------------------------------------------------|----------------------------|------------------
-TMB_FIMS_REAL_TYPE double                      | < double >                 | 
-TMB_FIMS_FIRST_ORDER AD<TMB_FIMS_REAL_TYPE>    | AD < double >              | MLE
-TMB_FIMS_SECOND_ORDER AD<TMB_FIMS_FIRST_ORDER> | AD< AD < double > >        | Variance
-TMB_FIMS_THIRD_ORDER AD<TMB_FIMS_SECOND_ORDER> | AD< AD< AD < double > > >  | Laplace approximation
+def                                            |CppAD Type                    |Value           |Used to evaluate
+-----------------------------------------------|----------------------------|-----------------------------------------
+TMB_FIMS_REAL_TYPE double                      | < double >                 | likelihood     |
+TMB_FIMS_FIRST_ORDER AD<TMB_FIMS_REAL_TYPE>    | AD < double >              | 1st derivative | MLE
+TMB_FIMS_SECOND_ORDER AD<TMB_FIMS_FIRST_ORDER> | AD< AD < double > >        | 2nd derivative | Variance
+TMB_FIMS_THIRD_ORDER AD<TMB_FIMS_SECOND_ORDER> | AD< AD< AD < double > > >  | 3rd derivative | Laplace approximation
+
 
 ---
+# TMB AD Types
 
+.pull-left-wide[
+**CppAD**<br>
+
+```{Rcpp, eval = FALSE}
+#ifdef TMB_MODEL
+// simplify access to singletons
+#define TMB_FIMS_REAL_TYPE double
+#define TMB_FIMS_FIRST_ORDER AD<TMB_FIMS_REAL_TYPE>
+#define TMB_FIMS_SECOND_ORDER AD<TMB_FIMS_FIRST_ORDER>
+#define TMB_FIMS_THIRD_ORDER AD<TMB_FIMS_SECOND_ORDER>
+#endif
+```
+]
+.pull-right-narrow[
+**TMBad**<br>
+```{Rcpp, eval = FALSE}
+#ifdef TMB_MODEL
+#ifdef TMBAD_FRAMEWORK
+#define TMBAD_TYPE TMBad::ad_aug 
+#endif
+#endif
+```
+]
+
+
+
+<br>
+**TMBad is available with TMB 1.8.0 and higher**
+---
 class: middle
 
-# Likelihoods and AD Types
+# Likelihood Review
 ---
-# Maximum Likelihood Estimation
+# ML Inference
 
 What is the likelihood for 30 successes in 100 trials?
 
 .pull-left[
-1. Specify the model <br><br>
+1. **Specify the model** <br><br>
 $y ~ \sim Binomial(n, p)$
 ]
 ---
@@ -318,13 +452,13 @@ What is the likelihood for 30 successes in 100 trials?
 
 .pull-left[
 1. Specify the model
-2. Calculate the likelihood<br><br>
+2. **Calculate the likelihood**<br><br>
 $L(p; n, y) = \frac{n!}{y!(n-y)!}p^y(1-p)^{n-y}$
 ]
 
 .pull-right[
 $L(p; n = 100, y = 30)$
-```{r, eval=TRUE, echo = FALSE}
+```{r, eval=TRUE, out.width = '80%', echo = FALSE}
 curve(dbinom(30,100,x),0,0.75, ylab = 'L(p)', xlab = 'p')
 ```
 ]
@@ -337,14 +471,14 @@ What is the likelihood for 30 successes in 100 trials?
 .pull-left[
 1. Specify the model
 2. Calculate the likelihood
-3. Calculate the negative log-likelihood<br><br>
+3. **Calculate the negative log-likelihood**<br><br>
 $-\ell(p; n, y) = -[ln\big(\frac{n!}{y!(n-y)!}\big) + yln(p)$<br>
      $$+ (n-y)ln(1-p)]$$
 ]
 
 .pull-right[
 $-ln\big[L(p; n = 100, y = 30)\big]$
-```{r, eval=TRUE, echo = FALSE}
+```{r, eval=TRUE, out.width = '80%', echo = FALSE}
 curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
 ```
 ]
@@ -360,13 +494,13 @@ What is the likelihood for 30 successes in 100 trials?
 3. Calculate the negative log-likelihood
 $-\ell(p; n, y) = -[ln\big(\frac{n!}{y!(n-y)!}\big) + yln(p)$<br>
      $$+ (n-y)ln(1-p)]$$
-4. Calculate the derivative w.r.t. $p$<br><br>
+4. **Calculate the derivative w.r.t. $p$**<br><br>
 $\frac{d(\ell(p; n, y))}{dp} = \frac{y}{p}- \frac{n-y}{1-p}$
 ]
 
 .pull-right[
 $-ln\big[L(p; n = 100, y = 30)\big]$
-```{r, eval=TRUE, echo = FALSE}
+```{r, eval=TRUE, out.width = '80%', echo = FALSE}
 curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
 ```
 ]
@@ -381,67 +515,58 @@ What is the likelihood for 30 successes in 100 trials?
 2. Calculate the likelihood
 3. Calculate the negative log-likelihood
 4. Calculate the derivate wrt p
-5. Set to 0 and solve for MLE<br><br>
-for n = 100 and y = 30, 
-\begin{align}
-0 &= \frac{y}{p}- \frac{n-y}{1-p}\\
-\hat{p} &= \frac{y}{n} \\
-\hat{p} &= \frac{30}{100} = 0.3
-\end{align}
+5. **Set to 0 and solve for MLE**<br>
+$0 = \frac{y}{p}- \frac{n-y}{1-p}$ <br>
+$E[p] = \frac{y}{n}$<br>
+$E[y] = np$
 ]
 
 .pull-right[
 $-ln\big[L(p; N = 100, y = 30)\big]$
-```{r, eval=TRUE, echo = FALSE}
+```{r, eval=TRUE, out.width = '70%', echo = FALSE}
 curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
 nll <- -dbinom(30,100,.3,TRUE)
 segments(0.1, nll, 0.5, nll, col='red', lwd=2)
 ```
+<br>
+$\hat{p} = \frac{30}{100} = 0.3$
 ]
----
-class: middle
-
-#Uncertainty
 
 ---
-##Asymptotic approximation with $f''$
 
-The second derivative measures the curvature of the likelihood and is approximately equal to the negative inverse of the variance when evaluated at the MLE
+# ML Inference
 
-Poisson Likelihood: $f(y) = \frac{e^{-\lambda}\lambda^{y}}{y!}$, for **y = 2**:
-.three-column[
-log-likelihood: 
+What is the likelihood for 30 successes in 100 trials?
 
+.pull-left[
+1. Specify the model
+2. Calculate the likelihood
+3. Calculate the negative log-likelihood
+4. Calculate the derivate wrt p
+5. Set to 0 and solve for MLE<br>
+$0 = \frac{y}{p}- \frac{n-y}{1-p}$ <br>
+$E[y] = np$
+6. **Approximate Var[p] using the second derivative**<br>
+$-\frac{y}{p^2} - \frac{(n-y)}{(1-p)^2}$<br>
+$-\frac{np}{p^2} - \frac{(n-np)}{(1-p)^2}$<br>
+$-\frac{n}{p} - \frac{n(1-p)}{1-p}$<br>
+$l''(p) = -\frac{n(1-p)}{p}$<br>
+$Var[p] = \frac{p}{n(1-p)}$
+]
 
-$\small \ell(\lambda) = -\lambda + ylog(\lambda) - log(y!)$
-```{r echo = FALSE}
-curve(log(dpois(2,x)), xlab = expression(lambda), ylab = expression("l("~ lambda ~ "|y=2)"),0,5, cex.lab = 1.5)
+.pull-right[
+$Var[p] \approx -\frac{1}{l''(p)}$<br>
+$SE[p] \approx \sqrt{ \frac{.3}{100(.7)}} \approx 0.065$<br>
+```{r, eval=TRUE, out.width = '70%', echo = FALSE}
+curve(-log(dbinom(30,100,x)),0,0.75, ylab = 'l(p)', xlab = 'p')
+nll <- -dbinom(30,100,.3,TRUE)
+points(0.3, nll, col = 'red')
+confint <- .3 + c(-1,1)*2*sqrt(.3/70)
+segments(confint[1], -log(dbinom(30,100,confint[1])), confint[1], 100, col='red', lwd=2)
+segments(confint[2], -log(dbinom(30,100,confint[2])), confint[2], 100, col='red', lwd=2)
+text(.3, 20, "95% confint", col='red', cex = 2)
 ```
-
 ]
-
-.three-column[
-1st derivative: 
-
-$\frac{d\ell(\lambda)}{d\lambda} = -n + \frac{y}{\lambda}$
-```{r echo = FALSE}
-pois.1d <- function(x,y){-1 + y/x}
-curve(pois.1d(x,2), xlab = expression(lambda), ylab = expression("l("~ lambda ~ "|y=2)'"),0,5, cex.lab = 1.5)
-```
-$\frac{\hat{y}}{n} = \lambda$
-]
-
-.three-column[
-2nd Derivative: 
-
-$\frac{d^{2}\ell(\lambda)}{d\lambda^{2}} = -\frac{y}{\lambda^{2}}$
-
-Evaluated at the MLE:
-$$-\frac{n\lambda}{\lambda^{2}} = -\frac{n}{\lambda}$$
-$$Var(\lambda) = \frac{\lambda}{n}$$
-
-]
-
 ---
 #Multivariate asymptotics
 
@@ -471,131 +596,51 @@ $$\Large \int_{\mathbb{R}}f(y;u,\theta)f(u;\theta)du$$
 ---
 # The Laplace approximation<br>
 
-The marginal likelihood of the data after integrating out random effects, $u$: 
-$$L(\theta) = \int_{\mathbb{R}}f(y;u,\theta)f(u;\theta)du$$
-1. The random effects likelihood is minimized to find $\hat{u}$:
-$$\hat{u}(\theta) = \underset{u}{argmin}f(u,\theta)$$
-2. The Hessian (matrix of partial 2nd derivatives) of $f(u,\theta)$ w.r.t. $u$ is evaluated at $\hat{u}(\theta)$:
-$$\mathbb{H}(\theta) = f^{"}_{uu}(\hat{u}(\theta), \theta)$$
-3. The Laplace approximation for the marginal likelihood is:
+Changes the problem from integration to optimization <br>
+.pull-left[
+$$L(\theta) = \int_{\mathbb{R}}f(y;u,\theta)f(u;\theta)du$$<br><br>
 $$L^{*}(\theta) = \sqrt{2\pi}^{n}det(\mathbb{H})^{-1/2}f(y,\hat{u}, \theta)$$
----
-#Implementing random effects in TMB
-
-Random effect group term:
-$$u \sim N(0, \sigma_{u})$$
-Observations:
-\begin{align}
-\mu &= X\beta + Bu\\
-y &\sim N(0,\sigma_{y})
-\end{align}
-
----
-#Implementing RE in TMB
-
-.pull-left[
-```cpp
-#include <TMB.hpp>
-
-template<class Type>
-Type objective_function<Type>::operator()()
-{
-  DATA_VECTOR(y);         
-  DATA_SPARSE_MATRIX(B);  
-  DATA_SPARSE_MATRIX(X); 
-  PARAMETER_VECTOR(u);    
-  PARAMETER_VECTOR(beta); 
-  PARAMETER(lnSDu);      
-  PARAMETER(lnSDy);     
-
-  Type nll = 0;
-  Type sdu = exp(lnSDu);
-  nll -= dnorm(u, Type(0), sdu, true).sum();
-
-  vector<Type> mu = X * beta + B * u;
-  Type sdy = exp(lnSDy);
-  nll -= dnorm(y, mu, sdy, true).sum();
-
-   return ans;
-}
-```
 ]
-
 .pull-right[
-Simulate Data:
-```{r}
-set.seed(123)
-yr <- rep(1900:2010,each=2)
-year <- factor(yr)
-quarter <- factor(
-  rep(1:4,length.out=length(year))
-)
-period <- factor((yr > mean(yr))+1)
-## Random year+quarter effect, 
-## fixed period effect:
-B <- model.matrix(~year+quarter-1)
-X <- model.matrix(~period-1)
-#B <- as(B,"dgTMatrix")
-#X <- as(X,"dgTMatrix")
-u <- rnorm(ncol(B)) ## logsdu=0
-beta <- rnorm(ncol(X))*100
-eps <- rnorm(nrow(B),sd=1) ## logsd0=0
-y <- as.numeric( 
-  X %*% beta + B %*% u + eps
-)
+```{r, echo = FALSE, out.width="100%", fig.align="left"}
+knitr::include_graphics("static/laplace-accuracy.png")
 ```
+<br>
+Figure from [Albertsen, C. M. (2018), 2.3.1](https://backend.orbit.dtu.dk/ws/portalfiles/portal/157133664/Publishers_version.pdf)
 ]
+---
+# The Laplace approximation<br>
 
+Changes the problem from integration to optimization <br>
+.pull-left[
+$$L(\theta) = \int_{\mathbb{R}}f(y;u,\theta)f(u;\theta)du$$<br><br>
+$$L^{*}(\theta) = \sqrt{2\pi}^{n}det(\mathbb{H})^{-1/2}f(y,\hat{u}, \theta)$$<br><br>
+$$d'(l^{*}) = d'(logdet(\mathbb{H})^{-1/2}) + d'(log(f(y,\hat{u}, \theta)))$$
+]
+.pull-right[
+```{r, echo = FALSE, out.width="100%", fig.align="left"}
+knitr::include_graphics("static/laplace-accuracy.png")
+```
+<br>
+Figure from [Albertsen, C. M. (2018), 2.3.1](https://backend.orbit.dtu.dk/ws/portalfiles/portal/157133664/Publishers_version.pdf)
+]
 ---
 
-#Implementing RE in TMB
+# Review of TMB::CppAD Types
+<br>
 
-.pull-left[
-```cpp
-#include <TMB.hpp>
 
-template<class Type>
-Type objective_function<Type>::operator()()
-{
-  DATA_VECTOR(y);         
-  DATA_SPARSE_MATRIX(B);  
-  DATA_SPARSE_MATRIX(X); 
-  PARAMETER_VECTOR(u);    
-  PARAMETER_VECTOR(beta); 
-  PARAMETER(lnSDu);      
-  PARAMETER(lnSDy);     
+def                                            |CppAD Type                    |Value             |Used to evaluate
+-----------------------------------------------|----------------------------|--------------------------------------
+TMB_FIMS_REAL_TYPE double                      | < double >                 | $l^{*}(\theta)$  |
+TMB_FIMS_FIRST_ORDER AD<TMB_FIMS_REAL_TYPE>    | AD < double >              | $\approx 0$      | MLE
+TMB_FIMS_SECOND_ORDER AD<TMB_FIMS_FIRST_ORDER> | AD< AD < double > >        | $\mathbb{H}$     | Variance, Laplace
+TMB_FIMS_THIRD_ORDER AD<TMB_FIMS_SECOND_ORDER> | AD< AD< AD < double > > >  | $d'(\mathbb{H})$ | Laplace 
 
-  Type nll = 0;
-  Type sdu = exp(lnSDu);
-  nll -= dnorm(u, Type(0), sdu, true).sum();
-
-  vector<Type> mu = X * beta + B * u;
-  Type sdy = exp(lnSDy);
-  nll -= dnorm(y, mu, sdy, true).sum();
-
-   return ans;
-}
+---
+# TMB and FIMS
+[**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g13fa6bc6e99_0_0)
+```{r, echo = FALSE, out.width="60%", fig.align="left"}
+knitr::include_graphics("static/fims-tmb.png")
 ```
-]
 
-.pull-right[
-Run Model:
-```{r}
-library(TMB)
-#compile("../src/simple_re.cpp")
-dyn.load(dynlib("../src/simple_re"))
-obj <- MakeADFun(
-  data=list(y=y, 
-            B = as(B,"dgTMatrix"), 
-            X = as(X,"dgTMatrix")),
-  parameters=list(u=u*0, beta=beta*0, 
-                  lnSDu=1, lnSDy=1),
-                 random="u",
-                 DLL="simple_re",
-                 silent=TRUE
-                 )
-opt <- nlminb(obj$par, obj$fn, obj$gr)
-c(round(beta,2),0,0)
-round(opt$par,2)
-```
-]

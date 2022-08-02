@@ -1,0 +1,298 @@
+---
+title:  "Parameters and Simulation"
+subtitle: "TMB Training Session I"
+author: "Andrea Havron<br>NOAA Fisheries, OST"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: ["xaringan-themer.css", "slides-style.css"]
+    lib_dir: libs
+    nature:
+      ratio: '16:9'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc( (%current% - 1) / (%total% - 1) * 100%);">
+          </div>
+        </div>`
+---
+
+layout: true
+
+.footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
+
+
+<style type="text/css">
+
+code.cpp{
+  font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-tile-view, echo=FALSE}
+# this gives you a tile navigation if you type "O" at any time
+xaringanExtra::use_tile_view()
+```
+
+
+---
+#Maturity at age model<br>
+The number of mature fish, $Y_{y,a}$ out of the total number of fish, $N_{y,a}$ at year, $y$ and age, $a$, can be expressed as a binomial distribution,
+
+$$Y_{y,a} \sim Binom(N_{y,a}, p_{y,a})$$,
+
+where $p$ represents the probability of maturity. Common to estimate maturity using logistic regression: 
+
+$$log\left(\frac{p_{y,a}}{1-p_{y,a}}\right) = \eta_{y,a} = \beta_0 + \beta_1 a$$
+
+The age of 50% maturity is $a_{50} = -\frac{\beta_0}{\beta_1}$,
+
+---
+#Maturity at age model<br>
+
+.pull-left[
+```cpp
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(Y);
+  DATA_VECTOR(N);
+  DATA_VECTOR(age_obs); 
+  DATA_INTEGER(max_age); 
+  PARAMETER_VECTOR(beta); 
+
+  int n_obs = Y.size();
+  vector<Type> nll(n_obs);
+  nll.setZero();
+     
+  vector<Type> logit_mat(n_obs);
+  vector<Type> mat(n_obs);
+  for(int i = 0; i < n_obs; i++) {
+    logit_mat(i) = beta(0) + 
+       beta(1)*age_obs(i); 
+    mat(i) = 1/(1 + exp(-logit_mat(i)));
+    nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  }
+
+  return sum(nll);
+}
+```
+]
+
+.pull-right[
+Simulate data
+```{r, eval = FALSE}
+a50 = 5
+slope = 2
+beta = c(-slope*a50,slope)
+ages = t(matrix(1:20, 20, 40))
+mat = 1/(1+exp(-(beta[1] + beta[2]*ages)))
+set.seed(123)
+samp <- sample(50:100, length(ages),
+               replace=TRUE)
+N = matrix(samp, nrow = 20)
+ysim <- rbinom(length(N), N, mat)
+Y = matrix(ysim, nrow = 20)
+```
+]
+---
+
+#Maturity at age model<br>
+
+.pull-left[
+```cpp
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator()()
+{
+  DATA_VECTOR(Y);
+  DATA_VECTOR(N);
+  DATA_VECTOR(age_obs); 
+  DATA_INTEGER(max_age); 
+  PARAMETER_VECTOR(beta); 
+
+  int n_obs = Y.size();
+  vector<Type> nll(n_obs);
+  nll.setZero();
+     
+  vector<Type> logit_mat(n_obs);
+  vector<Type> mat(n_obs);
+  for(int i = 0; i < n_obs; i++) {
+    logit_mat(i) = beta(0) + 
+       beta(1)*age_obs(i); 
+    mat(i) = 1/(1 + exp(-logit_mat(i)));
+    nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  }
+
+  return sum(nll);
+}
+```
+]
+
+.pull-right[
+Run model
+```{r, eval = FALSE}
+library(TMB)
+compile("maturity_0.cpp")
+dyn.load(dynlib("maturity_0"))
+
+input = list(data=list(),par=list())
+input$par$beta = c(0,0)
+input$data$Y = c(Y)
+input$data$N = c(N)
+input$data$age_obs = c(ages)
+input$data$max_age = max(ages)
+
+mod = MakeADFun(input$data, input$par, 
+                DLL = "maturity_0")
+
+opt = nlminb(mod$par, mod$fn, mod$gr)
+```
+See 
+* [maturity_0.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_0.R)
+* [maturity_0.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_0.cpp)
+
+]
+---
+class: middle
+
+#Dealing with parameters
+---
+#Parameter transformations
+
+#### Two types of transformations:
+1. Individual parameters to map from real to parameter space
+  * Minimizers search for MLE from $-\infty$ to $+\infty$
+  * Certain parameters have restricted support:
+      * $\sigma^{2} > 0$
+        ```cpp
+        sigma = exp(ln_sigma)
+        ```
+      * $0 < \pi < 1$ 
+      ```cpp
+      pi = 1/(1 + exp(-logit_pi)) # "expit"
+      ```
+2. Expected values of distributions
+  * Generalized Linear or Generalized Linear Mixed Models: model a function of the mean that is linear in X, for example:
+    * $\eta = X\beta$
+    * $y \sim \text{Pois}(exp(\eta))$
+    * $y \sim \text{Binomial}(N, expit(\eta))$
+  
+---
+#Parameter mapping
+#### TMB allows users to collect and fix parameters using the map argument in MakeADFun()
+* The parameter map is a list of parameters that are fixed or collected in a model run
+* Parameter names and dimensions in the map list must match those of the parameter list
+* The map list is structured as a list of factors
+* Parameters with factor(NA) are fixed
+* Parameters with equal factor levels are collected to a common value
+
+```{r, eval = FALSE}
+#fix slope = 0 : constant proportion with age
+input$map$beta = factor(c(1,NA)) 
+mod = MakeADFun(input$data, input$par, map = input$map)
+
+#intercept = slope
+input$map$beta = factor(c(1,1)) 
+mod = MakeADFun(input$data, input$par, map = input$map)
+```
+
+---
+#Derived parameters
+#### REPORT() and ADREPORT
+* output supplied to REPORT() will be available on R side using mod$report()
+* output supplied to ADREPORT() will have uncertainty estimated using TMB::sdreport()
+
+.pull-left[
+```cpp
+  vector<Type> logit_mat_at_age(max_age);
+  for(int i = 0; i < max_age; i++) logit_mat_at_age(i) = beta(0)  + beta(1)*Type(i+1);
+  vector<Type> mat_at_age = 1/(1+ exp(-logit_mat_at_age));
+  Type a50 = -beta(0)/beta(1);
+  REPORT(mat);
+  ADREPORT(a50);
+  REPORT(nll);
+  ADREPORT(logit_mat_at_age);
+  ADREPORT(mat_at_age);
+  return sum(nll);
+  ...
+  
+```
+]
+.pull-right[
+```{r, eval = FALSE}
+opt = nlminb(mod$par, mod$fn, mod$gr)
+mod$rep = mod$report()
+mod$sdrep = sdreport(mod)
+summary(mod$sdrep)
+
+```
+]
+
+---
+
+class: middle
+
+# Simulation
+---
+# Simulation in TMB
+
+* Standard generator functions to simulate data within the TMB model:
+
+```cpp
+rnorm()           rpois()           runif()
+rbinom()          rgamma()          rexp()          
+rbeta()           rf()              rlogis()  
+rt()              rweibull()        rcompois()
+rtweedie()        rnbinom()         rnbinom2()
+```
+
+
+* Simulation blocks are used to call simulations from R
+
+.pull-left[
+```cpp
+for(int i = 0; i < n_obs; i++){
+  logit_mat(i) = beta(0) + 
+     beta(1)*age_obs(i); 
+  mat(i) = 1/(1 + exp(-logit_mat(i)));
+  nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  SIMULATE{
+    Y(i) = rbinom(N(i), mat(i));
+  }
+}
+SIMULATE{
+  REPORT(Y);
+}
+```
+]
+
+.pull-right[
+```{r, eval = FALSE}
+mod <- MakeADFun(input$data, input$par, 
+                DLL = "maturity_0")
+
+opt <- nlminb(mod$par, mod$fn, mod$gr)
+
+y.sim <- mod$simulate()
+```
+*Note*
+* optimization not necessary for simulation
+* not vectorized like in R
+]
+
