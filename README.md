@@ -8,4 +8,12 @@ A repository for FIMS TMB training
 
 - [TMB Ouput](https://noaa-fims.github.io/TMB_training/2022_FIMS_Workshop/docs/TMB_diagnostics.html): Checking and Validating TMB output
 
-2022 FIMS Session I
+2022 TMB Session I
+
+- [Statistical Computing Review](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/00_Likelihoods_AD.html)
+
+- [TMB Basics](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/01_TMB_Basics.html)
+
+- [Parameters and Simulation](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/02_Parameters.html)
+
+- [Debugging](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/03_Debugging_I.html)
