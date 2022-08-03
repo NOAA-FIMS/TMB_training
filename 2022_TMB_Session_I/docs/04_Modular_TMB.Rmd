@@ -1,0 +1,127 @@
+---
+title:  "Modular TMB Example"
+subtitle: "TMB Training Session I"
+author: "Andrea Havron<br>NOAA Fisheries, OST"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: ["xaringan-themer.css", "slides-style.css"]
+    lib_dir: libs
+    nature:
+      ratio: '16:9'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc( (%current% - 1) / (%total% - 1) * 100%);">
+          </div>
+        </div>`
+---
+
+layout: true
+
+.footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
+
+
+<style type="text/css">
+
+code.cpp{
+  font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-tile-view, echo=FALSE}
+# this gives you a tile navigation if you type "O" at any time
+xaringanExtra::use_tile_view()
+```
+
+---
+# C++ Anatomy of a Class
+
+```cpp
+class ClassName{
+  Access specifier: //can be private, public, or protected
+  Data members; //variables to be used
+  
+  ClassName(){} //Constructor - automatically called when new object created
+  
+  Member functions(){} //Methods to access data members
+  
+}; //class name ends with semicolon
+
+
+//create instance of class
+ClassName<T>* ClassName<T>::instance = new ClassName<T>();
+
+```
+.p[
+- Memory is not allocated when a class is defined
+- An instance of the class needs to be created for memory allocation (new object created)
+- **new** is the C++ initialize function that allocates memory
+- Once the class is instantiated, members can be accessed using the dot('.')
+]
+resources:<br>
+[**geeksforgeeks**](https://www.geeksforgeeks.org/c-classes-and-objects/)<br>
+[**cplusplus**](https://cplusplus.com/doc/tutorial/classes/)
+---
+# FIMS Dmultinom class
+[inst/include/distributions/functors/tmb_distributions.hpp](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/distributions/functors/tmb_distributions.hpp)
+
+.pull-left-wide[
+```cpp
+#ifdef TMB_MODEL
+
+template <typename T>
+struct Dmultinom : public DistributionsBase<T> {
+  /** EigenVector defined in interface.hpp */
+  using Vector = typename ModelTraits<T>::EigenVector;
+  Vector x; /*!< Vector of length K of integers */
+  Vector p; /*!< Vector of length K, specifying the probability for the K
+               classes (note, unlike in R these must sum to 1). */
+
+  Dmultinom() : DistributionsBase<T>() {}
+
+  /**
+   * @brief Probability mass function of the multinomial distribution.
+   *
+   * @param do_log Boolean; if true, log densities are returned
+   */
+  virtual const T evaluate(const bool& do_log) {
+    return dmultinom(x, p, do_log);
+  }
+};
+
+#endif
+
+```
+]
+.pull-right-narrow[
+Access class members and functions
+<br>
+```cpp
+fims::Dmultinom<T> ll_dmultinom;
+ll_dmultinom.x = x;
+ll_dmultinom.p = p;
+ll_dmultinom.evaluate(true);
+```
+]
+
+---
+class: middle
+.large[
+[**Model used to test Dmultinom**](https://github.com/NOAA-FIMS/FIMS/blob/193-feature-rcpp-interface-to-call-module-likelihoods/inst/extdata/TMB_tests/distributions/test_dmultinom_distribution.hpp)
+
+
+[**Corresponding TMB Model**](https://github.com/NOAA-FIMS/FIMS/blob/193-feature-rcpp-interface-to-call-module-likelihoods/inst/extdata/TMB_tests/distributions/test_dmultinom_distribution.cpp)
+]

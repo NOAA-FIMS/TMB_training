@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang xml:lang>
   <head>
-    <title>Parameters and Simulation</title>
+    <title>Modular TMB Example</title>
     <meta charset="utf-8" />
     <meta name="author" content="Andrea Havron NOAA Fisheries, OST" />
     <script src="data:application/javascript;base64,Ly8gUGFuZG9jIDIuOSBhZGRzIGF0dHJpYnV0ZXMgb24gYm90aCBoZWFkZXIgYW5kIGRpdi4gV2UgcmVtb3ZlIHRoZSBmb3JtZXIgKHRvCi8vIGJlIGNvbXBhdGlibGUgd2l0aCB0aGUgYmVoYXZpb3Igb2YgUGFuZG9jIDwgMi44KS4KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsIGZ1bmN0aW9uKGUpIHsKICB2YXIgaHMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJkaXYuc2VjdGlvbltjbGFzcyo9J2xldmVsJ10gPiA6Zmlyc3QtY2hpbGQiKTsKICB2YXIgaSwgaCwgYTsKICBmb3IgKGkgPSAwOyBpIDwgaHMubGVuZ3RoOyBpKyspIHsKICAgIGggPSBoc1tpXTsKICAgIGlmICghL15oWzEtNl0kL2kudGVzdChoLnRhZ05hbWUpKSBjb250aW51ZTsgIC8vIGl0IHNob3VsZCBiZSBhIGhlYWRlciBoMS1oNgogICAgYSA9IGguYXR0cmlidXRlczsKICAgIHdoaWxlIChhLmxlbmd0aCA+IDApIGgucmVtb3ZlQXR0cmlidXRlKGFbMF0ubmFtZSk7CiAgfQp9KTsK"></script>
@@ -14,7 +14,7 @@
     <textarea id="source">
 class: center, middle, inverse, title-slide
 
-# Parameters and Simulation
+# Modular TMB Example
 ## TMB Training Session I
 ### Andrea Havron<br>NOAA Fisheries, OST
 
@@ -44,271 +44,83 @@ code.r{
 
 
 ---
-class: middle
+# C++ Anatomy of a Class
 
-#Dealing with parameters
----
-#Parameter Transformations
-.pull-left[
-Map parameters from real to parameter space
-  * Minimizers search for MLE from `\(-\infty\)` to `\(+\infty\)`
-  * Certain parameters have restricted support:
-      * `\(\sigma^{2} &gt; 0\)`
-        ```cpp
-        sigma = exp(ln_sigma)
-        ```
-      * `\(0 &lt; \pi &lt; 1\)` 
-      ```cpp
-      pi = 1/(1 + exp(-logit_pi)) # &quot;expit&quot;
-      ```
-]
-
-.pull-right[
-![](data:image/png;base64,#02_Parameters_files/figure-html/unnamed-chunk-1-1.png)&lt;!-- --&gt;![](data:image/png;base64,#02_Parameters_files/figure-html/unnamed-chunk-1-2.png)&lt;!-- --&gt;
-]
----
-#Expected Value Transformations
-
-&lt;br&gt;
-  * Generalized Linear or Generalized Linear Mixed Models: model a function of the mean that is linear in X:
-    `$$\text{GLM: }\eta = X\beta$$` 
-    `$$\text{GLMM: }\eta = X\beta + u$$`
-    `$$E[Y] = g^{-1}(\eta)$$`
-  * Distributions from the [**exponential family**](https://en.wikipedia.org/wiki/Exponential_family) have natural transformations and inverse link functions:
-    `$$y \sim \text{Pois}(exp(\eta))$$`
-    `$$y \sim \text{Binomial}(N, expit(\eta))$$`
-
----
-#Expected Value Transformations
-.three-column[
-**Multinomial:** 
-`$$p_{1}, ... p_{k}$$`
-`$$p_{k} = 1 - \sum^{k-1}_{i=1}p_{i}$$`
-]  
-.three-column[
-Natural link function
-`\begin{bmatrix}
-log\frac{p_{1}}{1 - \sum^{k-1}_{i=1}p_{i}}\\
-\vdots\\
-log\frac{p_{k-1}}{1 - \sum^{k-1}_{i=1}p_{i}}\\
-0
-\end{bmatrix}`
-
-]  
-.three-column[
-Inverse Link Function
-`\begin{bmatrix}
-\frac{exp(\eta_{1})}{1 + \sum^{k-1}_{i=1}exp(\eta_{i})}\\
-\vdots\\
-\frac{exp(\eta_{k-1})}{1 + \sum^{k-1}_{i=1}exp(\eta_{i})}\\
-\frac{1}{1 + \sum^{k-1}_{i=1}exp(\eta_{i})}
-\end{bmatrix}`
-]  
-
-&lt;br&gt;
-
-`\(\hspace{1.7in}\)`**Gamma:**
-`\begin{align}
-E[Y] &amp;= \alpha\beta = exp(\eta)\\
-Var[Y] &amp;= \alpha\beta^{2}\\
-cv^{2} &amp;= \frac{\alpha\beta^{2}}{\alpha^{2}\beta^{2}} = \frac{1}{\alpha}\\
-y &amp;\sim \text{Gamma}(\frac{1}{cv^{2}}, exp(\eta)*cv^{2})
-\end{align}`
----
-#Non-linear Regression
-
-[**Orange tree example**](https://github.com/kaskr/adcomp/blob/master/tmb_examples/orange_big.cpp): Expected size of tree, `\(i\)` at time `\(t\)` is a logistic function of age:&lt;br&gt;
-`$$\mu_{i,t} = \frac{a}{1 + exp(-(age_{i,t} - b)/c)}$$`&lt;br&gt;
-a = upper maximum size&lt;br&gt;
-b = age when circumference = 1/2a&lt;br&gt;
-c = inverse growth rate&lt;br&gt;
-
-`$$y_{i,t} \sim N(\mu_{i,t}, \sigma)$$`
+```cpp
+class ClassName{
+  Access specifier: //can be private, public, or protected
+  Data members; //variables to be used
+  
+  ClassName(){} //Constructor - automatically called when new object created
+  
+  Member functions(){} //Methods to access data members
+  
+}; //class name ends with semicolon
 
 
+//create instance of class
+ClassName&lt;T&gt;* ClassName&lt;T&gt;::instance = new ClassName&lt;T&gt;();
 
-
----
-#Parameter mapping
-
-#### TMB allows users to collect and fix parameters using the map argument in MakeADFun()
-.large[.p[
-* The parameter map is a list of parameters that are fixed or collected in a model run
-* Names and dimensions of parameters in the map list must match those of the parameter list
-* The map list is structured as a list of factors
-* Parameters with factor(NA) are fixed
-* Parameters with equal factor levels are collected to a common value
-]]
-
----
-#Likelihood Ratio Tests
-
-.pull-left[
-`\(H_{0}\)`: Null Hypothesis 
+```
 .p[
-- `\(\theta \in \Theta_{0}\)`
-- parameter `\(\theta\)` is in a subset of a given parameter space, `\(\Theta_{0}\)`
-- restricted model
-]]
-.pull-right[
-`\(H_{1}\)`: Alternative Hypothesis
-
-.p[
-- `\(\theta \in \Theta\)`
-- parameter `\(\theta\)` is in the complete parameter space, `\(\Theta\)`
-- unrestricted, full model
-]]
-
-&lt;br&gt;
-**Likelihood Ratio Test**:
-`$$LR = -2[\ell(\theta_{0}) - \ell(\hat{\theta})]$$`
-
-`$$LR \sim \chi^{2}(df_{\chi^{2}} = df_{\Theta}-df_{\Theta_{0}})$$`
-
+- Memory is not allocated when a class is defined
+- An instance of the class needs to be created for memory allocation (new object created)
+- **new** is the C++ initialize function that allocates memory
+- Once the class is instantiated, members can be accessed using the dot(&#39;.&#39;)
+]
+resources:&lt;br&gt;
+[**geeksforgeeks**](https://www.geeksforgeeks.org/c-classes-and-objects/)&lt;br&gt;
+[**cplusplus**](https://cplusplus.com/doc/tutorial/classes/)
 ---
-# Parameter mapping with LR test
-&lt;br&gt;
-TMB example: [**lr_test.cpp**](https://github.com/kaskr/adcomp/blob/master/tmb_examples/lr_test.cpp)
+# FIMS Dmultinom class
+[inst/include/distributions/functors/tmb_distributions.hpp](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/distributions/functors/tmb_distributions.hpp)
 
+.pull-left-wide[
 ```cpp
-/ Illustrate map feature of TMB to perform likelihood ratio tests on a ragged array dataset.
-#include &lt;TMB.hpp&gt;
+#ifdef TMB_MODEL
 
-template&lt;class Type&gt;
-Type objective_function&lt;Type&gt;::operator() ()
-{
-  DATA_VECTOR(obs);
-  DATA_FACTOR(group);
-  
-  PARAMETER_VECTOR(mu);
-  PARAMETER_VECTOR(sd);
-  
-  Type res=0;
-  
-  for(int i=0;i&lt;obs.size();i++){
-    res -= dnorm(obs[i],mu[group[i]],sd[group[i]],true);
+template &lt;typename T&gt;
+struct Dmultinom : public DistributionsBase&lt;T&gt; {
+  /** EigenVector defined in interface.hpp */
+  using Vector = typename ModelTraits&lt;T&gt;::EigenVector;
+  Vector x; /*!&lt; Vector of length K of integers */
+  Vector p; /*!&lt; Vector of length K, specifying the probability for the K
+               classes (note, unlike in R these must sum to 1). */
+
+  Dmultinom() : DistributionsBase&lt;T&gt;() {}
+
+  /**
+   * @brief Probability mass function of the multinomial distribution.
+   *
+   * @param do_log Boolean; if true, log densities are returned
+   */
+  virtual const T evaluate(const bool&amp; do_log) {
+    return dmultinom(x, p, do_log);
   }
-  
-  return res;
-}
+};
+
+#endif
 
 ```
----
+]
+.pull-right-narrow[
+Access class members and functions
+&lt;br&gt;
+```cpp
+fims::Dmultinom&lt;T&gt; ll_dmultinom;
+ll_dmultinom.x = x;
+ll_dmultinom.p = p;
+ll_dmultinom.evaluate(true);
+```
+]
 
+---
 class: middle
-
-# Simulation
----
-# Simulation in TMB
-
-* Standard generator functions to simulate data within the TMB model:
-
-```cpp
-rnorm()           rpois()           runif()
-rbinom()          rgamma()          rexp()          
-rbeta()           rf()              rlogis()  
-rt()              rweibull()        rcompois()
-rtweedie()        rnbinom()         rnbinom2()
-```
+.large[
+[**Model used to test Dmultinom**](https://github.com/NOAA-FIMS/FIMS/blob/193-feature-rcpp-interface-to-call-module-likelihoods/inst/extdata/TMB_tests/distributions/test_dmultinom_distribution.hpp)
 
 
-* Simulation blocks are used to call simulations from R
-
-.pull-left[
-**Binomial Example**&lt;br&gt;
-C++ code
-```cpp
-for(int i = 0; i &lt; n_obs; i++){
-  eta(i) = beta(0) + beta(1)*x(i); 
-  p(i) = 1/(1 + exp(-eta(i)));
-  nll(i) = -dbinom(Y(i), N(i), p(i), true); 
-  SIMULATE{
-    Y(i) = rbinom(N(i), p(i));
-  }
-}
-SIMULATE{
-  REPORT(Y);
-}
-```
-]
-
-.pull-right[
-&lt;br&gt;
-R code
-
-```r
-set.seed(1) ## optional
-
-obj$simulate(complete = TRUE)
-```
-*Note*
-* optimization not necessary for simulation
-* not vectorized like in R
-]
-
----
-#Simulation Study
-
-.pull-left[
-linReg.cpp
-```cpp
- for(int i=0; i&lt;n; i++){
-    nll -= dnorm(y(i), mu(i), sigma, true);
-  }
-  SIMULATE{
-    y = rnorm(mu, sigma);
-    REPORT(y);
-  }
-```
-Set-up Model in R
-
-```r
-library(TMB)
-dyn.load(dynlib(&#39;../src/linReg&#39;))
-sig &lt;- 2
-beta &lt;- c(0.5,2)
-
-Data &lt;- list(y = rep(0,50), 
-             X =  cbind(rep(1,50), 1:50))
-Pars &lt;- list(beta = c(0.5,2),lnSigma = log(2))
-obj &lt;- MakeADFun(data = Data, 
-                 parameters = Pars, 
-                 DLL = &#39;linReg&#39;)
-obj$par
-```
-
-```
-##      beta      beta   lnSigma 
-## 0.5000000 2.0000000 0.6931472
-```
-]
-.pull-right[
-Run Simulation
-
-```r
-set.seed(1)
-sim &lt;- replicate(500, {
-  simdata &lt;- obj$simulate(par=obj$par, complete=TRUE)
-  obj2 &lt;- MakeADFun(simdata, Pars, 
-                    DLL=&quot;linReg&quot;, silent=TRUE)
-  nlminb(obj2$par, obj2$fn, obj2$gr)$par
-})
-obj$par
-```
-
-```
-##      beta      beta   lnSigma 
-## 0.5000000 2.0000000 0.6931472
-```
-
-```r
-apply(t(sim), 2, mean)
-```
-
-```
-##      beta      beta   lnSigma 
-## 0.5143324 1.9995115 0.6649257
-```
+[**Corresponding TMB Model**](https://github.com/NOAA-FIMS/FIMS/blob/193-feature-rcpp-interface-to-call-module-likelihoods/inst/extdata/TMB_tests/distributions/test_dmultinom_distribution.cpp)
 ]
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
@@ -418,10 +230,7 @@ if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
     s = s[1].replace(token, ''); d = data[s];
     if (d) el.style.backgroundImage = 'url("' + d + '")';
   }
-})({
-"02_Parameters_files/figure-html/unnamed-chunk-1-2.png": "data:image/png;base64,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",
-"02_Parameters_files/figure-html/unnamed-chunk-1-1.png": "data:image/png;base64,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"
-}, 'data:image/png;base64,#');</script>
+})({}, 'data:image/png;base64,#');</script>
 
 <script>
 slideshow._releaseMath = function(el) {

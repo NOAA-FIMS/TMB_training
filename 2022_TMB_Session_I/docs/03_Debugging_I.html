@@ -270,7 +270,7 @@ opt &lt;- nlminb(obj$par, obj$fn, obj$gr)
 **Non-Invertible Hessians**
 * The Hessian will **not be invertible** if the MLE is not a true minimum
 * When could this occur? Usually mis-specified models
- * Parameters confounded or overparameterized (too complex for data)
+* Parameters confounded or overparameterized (too complex for data)
 * TMB will warn about uninvertible Hessians (NaNs)
 
 ---

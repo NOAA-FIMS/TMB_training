@@ -17,3 +17,5 @@ A repository for FIMS TMB training
 - [Parameters and Simulation](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/02_Parameters.html)
 
 - [Debugging](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/03_Debugging_I.html)
+
+- [Modular TMB Example](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/04_Modular_TMB.html)

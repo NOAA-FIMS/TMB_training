@@ -51,7 +51,7 @@ class: middle
 
 #Dealing with parameters
 ---
-#Parameter transformations
+#Parameter Transformations
 .pull-left[
 Map parameters from real to parameter space
   * Minimizers search for MLE from $-\infty$ to $+\infty$
@@ -77,21 +77,23 @@ curve(fun(x), -5, 5, ylab = "pi", xlab = "")
 ```
 ]
 ---
-#Parameter transformations
+#Expected Value Transformations
 
-Expected values of distributions
+<br>
   * Generalized Linear or Generalized Linear Mixed Models: model a function of the mean that is linear in X:
-    $$\eta = X\beta$$
-  * Distributions from the [exponential family](https://en.wikipedia.org/wiki/Exponential_family) have natural transformations and inverse link functions:
+    $$\text{GLM: }\eta = X\beta$$ 
+    $$\text{GLMM: }\eta = X\beta + u$$
+    $$E[Y] = g^{-1}(\eta)$$
+  * Distributions from the [**exponential family**](https://en.wikipedia.org/wiki/Exponential_family) have natural transformations and inverse link functions:
     $$y \sim \text{Pois}(exp(\eta))$$
     $$y \sim \text{Binomial}(N, expit(\eta))$$
 
 ---
-#Parameter transformations
+#Expected Value Transformations
 .three-column[
 **Multinomial:** 
 $$p_{1}, ... p_{k}$$
-$$p_{k} = 1 - \sum^{k-1}$$
+$$p_{k} = 1 - \sum^{k-1}_{i=1}p_{i}$$
 ]  
 .three-column[
 Natural link function
@@ -106,10 +108,10 @@ log\frac{p_{k-1}}{1 - \sum^{k-1}_{i=1}p_{i}}\\
 .three-column[
 Inverse Link Function
 \begin{bmatrix}
-\frac{exp^{\eta_{1}}}{1 + \sum^{k-1}_{i=1}exp^{\eta_{i}}}\\
+\frac{exp(\eta_{1})}{1 + \sum^{k-1}_{i=1}exp(\eta_{i})}\\
 \vdots\\
-\frac{exp^{\eta_{k-1}}}{1 + \sum^{k-1}_{i=1}exp^{\eta_{k-1}}}\\
-\frac{1}{1 + \sum^{k-1}_{i=1}exp^{\eta_{k-1}}}
+\frac{exp(\eta_{k-1})}{1 + \sum^{k-1}_{i=1}exp(\eta_{i})}\\
+\frac{1}{1 + \sum^{k-1}_{i=1}exp(\eta_{i})}
 \end{bmatrix}
 ]  
 
@@ -117,17 +119,29 @@ Inverse Link Function
 
 $\hspace{1.7in}$**Gamma:**
 \begin{align}
-E[Y] &= \alpha\beta = exp^{\eta}\\
+E[Y] &= \alpha\beta = exp(\eta)\\
 Var[Y] &= \alpha\beta^{2}\\
 cv^{2} &= \frac{\alpha\beta^{2}}{\alpha^{2}\beta^{2}} = \frac{1}{\alpha}\\
-y &\sim \text{Gamma}(\frac{1}{cv^{2}}, exp^{\eta}*cv^{2})
+y &\sim \text{Gamma}(\frac{1}{cv^{2}}, exp(\eta)*cv^{2})
 \end{align}
+---
+#Non-linear Regression
+
+[**Orange tree example**](https://github.com/kaskr/adcomp/blob/master/tmb_examples/orange_big.cpp): Expected size of tree, $i$ at time $t$ is a logistic function of age:<br>
+$$\mu_{i,t} = \frac{a}{1 + exp(-(age_{i,t} - b)/c)}$$<br>
+a = upper maximum size<br>
+b = age when circumference = 1/2a<br>
+c = inverse growth rate<br>
+
+$$y_{i,t} \sim N(\mu_{i,t}, \sigma)$$
+
+
 
 
 ---
 #Parameter mapping
 
-### TMB allows users to collect and fix parameters using the map argument in MakeADFun()
+#### TMB allows users to collect and fix parameters using the map argument in MakeADFun()
 .large[.p[
 * The parameter map is a list of parameters that are fixed or collected in a model run
 * Names and dimensions of parameters in the map list must match those of the parameter list
@@ -162,9 +176,9 @@ $$LR = -2[\ell(\theta_{0}) - \ell(\hat{\theta})]$$
 $$LR \sim \chi^{2}(df_{\chi^{2}} = df_{\Theta}-df_{\Theta_{0}})$$
 
 ---
-# Likelihood Ratio Test example and parameter mapping
+# Parameter mapping with LR test
 <br>
-TMB example: [lr_test.cpp](https://github.com/kaskr/adcomp/blob/master/tmb_examples/lr_test.cpp)
+TMB example: [**lr_test.cpp**](https://github.com/kaskr/adcomp/blob/master/tmb_examples/lr_test.cpp)
 
 ```cpp
 / Illustrate map feature of TMB to perform likelihood ratio tests on a ragged array dataset.
@@ -211,7 +225,8 @@ rtweedie()        rnbinom()         rnbinom2()
 * Simulation blocks are used to call simulations from R
 
 .pull-left[
-**Binomial Example**
+**Binomial Example**<br>
+C++ code
 ```cpp
 for(int i = 0; i < n_obs; i++){
   eta(i) = beta(0) + beta(1)*x(i); 
@@ -228,6 +243,8 @@ SIMULATE{
 ]
 
 .pull-right[
+<br>
+R code
 ```{r, eval = FALSE}
 set.seed(1) ## optional
 
@@ -242,16 +259,26 @@ obj$simulate(complete = TRUE)
 #Simulation Study
 
 .pull-left[
-Set-up Model
+linReg.cpp
+```cpp
+ for(int i=0; i<n; i++){
+    nll -= dnorm(y(i), mu(i), sigma, true);
+  }
+  SIMULATE{
+    y = rnorm(mu, sigma);
+    REPORT(y);
+  }
+```
+Set-up Model in R
 ```{r}
 library(TMB)
 dyn.load(dynlib('../src/linReg'))
-sig <- 1
+sig <- 2
 beta <- c(0.5,2)
 
 Data <- list(y = rep(0,50), 
              X =  cbind(rep(1,50), 1:50))
-Pars <- list(beta = c(0.5,2),lnSigma = 0)
+Pars <- list(beta = c(0.5,2),lnSigma = log(2))
 obj <- MakeADFun(data = Data, 
                  parameters = Pars, 
                  DLL = 'linReg')
