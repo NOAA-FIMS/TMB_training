@@ -46,137 +46,14 @@ options(htmltools.dir.version = FALSE)
 xaringanExtra::use_tile_view()
 ```
 
-
----
-#Maturity at age model<br>
-The number of mature fish, $Y_{y,a}$ out of the total number of fish, $N_{y,a}$ at year, $y$ and age, $a$, can be expressed as a binomial distribution,
-
-$$Y_{y,a} \sim Binom(N_{y,a}, p_{y,a})$$,
-
-where $p$ represents the probability of maturity. Common to estimate maturity using logistic regression: 
-
-$$log\left(\frac{p_{y,a}}{1-p_{y,a}}\right) = \eta_{y,a} = \beta_0 + \beta_1 a$$
-
-The age of 50% maturity is $a_{50} = -\frac{\beta_0}{\beta_1}$,
-
----
-#Maturity at age model<br>
-
-.pull-left[
-```cpp
-#include <TMB.hpp>
-
-template<class Type>
-Type objective_function<Type>::operator()()
-{
-  DATA_VECTOR(Y);
-  DATA_VECTOR(N);
-  DATA_VECTOR(age_obs); 
-  DATA_INTEGER(max_age); 
-  PARAMETER_VECTOR(beta); 
-
-  int n_obs = Y.size();
-  vector<Type> nll(n_obs);
-  nll.setZero();
-     
-  vector<Type> logit_mat(n_obs);
-  vector<Type> mat(n_obs);
-  for(int i = 0; i < n_obs; i++) {
-    logit_mat(i) = beta(0) + 
-       beta(1)*age_obs(i); 
-    mat(i) = 1/(1 + exp(-logit_mat(i)));
-    nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
-  }
-
-  return sum(nll);
-}
-```
-]
-
-.pull-right[
-Simulate data
-```{r, eval = FALSE}
-a50 = 5
-slope = 2
-beta = c(-slope*a50,slope)
-ages = t(matrix(1:20, 20, 40))
-mat = 1/(1+exp(-(beta[1] + beta[2]*ages)))
-set.seed(123)
-samp <- sample(50:100, length(ages),
-               replace=TRUE)
-N = matrix(samp, nrow = 20)
-ysim <- rbinom(length(N), N, mat)
-Y = matrix(ysim, nrow = 20)
-```
-]
----
-
-#Maturity at age model<br>
-
-.pull-left[
-```cpp
-#include <TMB.hpp>
-
-template<class Type>
-Type objective_function<Type>::operator()()
-{
-  DATA_VECTOR(Y);
-  DATA_VECTOR(N);
-  DATA_VECTOR(age_obs); 
-  DATA_INTEGER(max_age); 
-  PARAMETER_VECTOR(beta); 
-
-  int n_obs = Y.size();
-  vector<Type> nll(n_obs);
-  nll.setZero();
-     
-  vector<Type> logit_mat(n_obs);
-  vector<Type> mat(n_obs);
-  for(int i = 0; i < n_obs; i++) {
-    logit_mat(i) = beta(0) + 
-       beta(1)*age_obs(i); 
-    mat(i) = 1/(1 + exp(-logit_mat(i)));
-    nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
-  }
-
-  return sum(nll);
-}
-```
-]
-
-.pull-right[
-Run model
-```{r, eval = FALSE}
-library(TMB)
-compile("maturity_0.cpp")
-dyn.load(dynlib("maturity_0"))
-
-input = list(data=list(),par=list())
-input$par$beta = c(0,0)
-input$data$Y = c(Y)
-input$data$N = c(N)
-input$data$age_obs = c(ages)
-input$data$max_age = max(ages)
-
-mod = MakeADFun(input$data, input$par, 
-                DLL = "maturity_0")
-
-opt = nlminb(mod$par, mod$fn, mod$gr)
-```
-See 
-* [maturity_0.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_0.R)
-* [maturity_0.cpp](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_0.cpp)
-
-]
 ---
 class: middle
 
 #Dealing with parameters
 ---
 #Parameter transformations
-
-#### Two types of transformations:
-1. Individual parameters to map from real to parameter space
+.pull-left[
+Map parameters from real to parameter space
   * Minimizers search for MLE from $-\infty$ to $+\infty$
   * Certain parameters have restricted support:
       * $\sigma^{2} > 0$
@@ -187,63 +64,131 @@ class: middle
       ```cpp
       pi = 1/(1 + exp(-logit_pi)) # "expit"
       ```
-2. Expected values of distributions
-  * Generalized Linear or Generalized Linear Mixed Models: model a function of the mean that is linear in X, for example:
-    * $\eta = X\beta$
-    * $y \sim \text{Pois}(exp(\eta))$
-    * $y \sim \text{Binomial}(N, expit(\eta))$
-  
+]
+
+.pull-right[
+```{r, echo = FALSE, fig.height = 3.5 }
+par(cex.lab = 1.5)
+fun <- function(x) exp(x)
+curve(fun(x), -5, 5, ylab = "sigma", xlab = "")
+
+fun <- function(x) 1/(1 + exp(-x))
+curve(fun(x), -5, 5, ylab = "pi", xlab = "")
+```
+]
+---
+#Parameter transformations
+
+Expected values of distributions
+  * Generalized Linear or Generalized Linear Mixed Models: model a function of the mean that is linear in X:
+    $$\eta = X\beta$$
+  * Distributions from the [exponential family](https://en.wikipedia.org/wiki/Exponential_family) have natural transformations and inverse link functions:
+    $$y \sim \text{Pois}(exp(\eta))$$
+    $$y \sim \text{Binomial}(N, expit(\eta))$$
+
+---
+#Parameter transformations
+.three-column[
+**Multinomial:** 
+$$p_{1}, ... p_{k}$$
+$$p_{k} = 1 - \sum^{k-1}$$
+]  
+.three-column[
+Natural link function
+\begin{bmatrix}
+log\frac{p_{1}}{1 - \sum^{k-1}_{i=1}p_{i}}\\
+\vdots\\
+log\frac{p_{k-1}}{1 - \sum^{k-1}_{i=1}p_{i}}\\
+0
+\end{bmatrix}
+
+]  
+.three-column[
+Inverse Link Function
+\begin{bmatrix}
+\frac{exp^{\eta_{1}}}{1 + \sum^{k-1}_{i=1}exp^{\eta_{i}}}\\
+\vdots\\
+\frac{exp^{\eta_{k-1}}}{1 + \sum^{k-1}_{i=1}exp^{\eta_{k-1}}}\\
+\frac{1}{1 + \sum^{k-1}_{i=1}exp^{\eta_{k-1}}}
+\end{bmatrix}
+]  
+
+<br>
+
+$\hspace{1.7in}$**Gamma:**
+\begin{align}
+E[Y] &= \alpha\beta = exp^{\eta}\\
+Var[Y] &= \alpha\beta^{2}\\
+cv^{2} &= \frac{\alpha\beta^{2}}{\alpha^{2}\beta^{2}} = \frac{1}{\alpha}\\
+y &\sim \text{Gamma}(\frac{1}{cv^{2}}, exp^{\eta}*cv^{2})
+\end{align}
+
+
 ---
 #Parameter mapping
-#### TMB allows users to collect and fix parameters using the map argument in MakeADFun()
+
+### TMB allows users to collect and fix parameters using the map argument in MakeADFun()
+.large[.p[
 * The parameter map is a list of parameters that are fixed or collected in a model run
-* Parameter names and dimensions in the map list must match those of the parameter list
+* Names and dimensions of parameters in the map list must match those of the parameter list
 * The map list is structured as a list of factors
 * Parameters with factor(NA) are fixed
 * Parameters with equal factor levels are collected to a common value
-
-```{r, eval = FALSE}
-#fix slope = 0 : constant proportion with age
-input$map$beta = factor(c(1,NA)) 
-mod = MakeADFun(input$data, input$par, map = input$map)
-
-#intercept = slope
-input$map$beta = factor(c(1,1)) 
-mod = MakeADFun(input$data, input$par, map = input$map)
-```
+]]
 
 ---
-#Derived parameters
-#### REPORT() and ADREPORT
-* output supplied to REPORT() will be available on R side using mod$report()
-* output supplied to ADREPORT() will have uncertainty estimated using TMB::sdreport()
+#Likelihood Ratio Tests
 
 .pull-left[
-```cpp
-  vector<Type> logit_mat_at_age(max_age);
-  for(int i = 0; i < max_age; i++) logit_mat_at_age(i) = beta(0)  + beta(1)*Type(i+1);
-  vector<Type> mat_at_age = 1/(1+ exp(-logit_mat_at_age));
-  Type a50 = -beta(0)/beta(1);
-  REPORT(mat);
-  ADREPORT(a50);
-  REPORT(nll);
-  ADREPORT(logit_mat_at_age);
-  ADREPORT(mat_at_age);
-  return sum(nll);
-  ...
-  
-```
-]
+$H_{0}$: Null Hypothesis 
+.p[
+- $\theta \in \Theta_{0}$
+- parameter $\theta$ is in a subset of a given parameter space, $\Theta_{0}$
+- restricted model
+]]
 .pull-right[
-```{r, eval = FALSE}
-opt = nlminb(mod$par, mod$fn, mod$gr)
-mod$rep = mod$report()
-mod$sdrep = sdreport(mod)
-summary(mod$sdrep)
+$H_{1}$: Alternative Hypothesis
+
+.p[
+- $\theta \in \Theta$
+- parameter $\theta$ is in the complete parameter space, $\Theta$
+- unrestricted, full model
+]]
+
+<br>
+**Likelihood Ratio Test**:
+$$LR = -2[\ell(\theta_{0}) - \ell(\hat{\theta})]$$
+
+$$LR \sim \chi^{2}(df_{\chi^{2}} = df_{\Theta}-df_{\Theta_{0}})$$
+
+---
+# Likelihood Ratio Test example and parameter mapping
+<br>
+TMB example: [lr_test.cpp](https://github.com/kaskr/adcomp/blob/master/tmb_examples/lr_test.cpp)
+
+```cpp
+/ Illustrate map feature of TMB to perform likelihood ratio tests on a ragged array dataset.
+#include <TMB.hpp>
+
+template<class Type>
+Type objective_function<Type>::operator() ()
+{
+  DATA_VECTOR(obs);
+  DATA_FACTOR(group);
+  
+  PARAMETER_VECTOR(mu);
+  PARAMETER_VECTOR(sd);
+  
+  Type res=0;
+  
+  for(int i=0;i<obs.size();i++){
+    res -= dnorm(obs[i],mu[group[i]],sd[group[i]],true);
+  }
+  
+  return res;
+}
 
 ```
-]
-
 ---
 
 class: middle
@@ -266,14 +211,14 @@ rtweedie()        rnbinom()         rnbinom2()
 * Simulation blocks are used to call simulations from R
 
 .pull-left[
+**Binomial Example**
 ```cpp
 for(int i = 0; i < n_obs; i++){
-  logit_mat(i) = beta(0) + 
-     beta(1)*age_obs(i); 
-  mat(i) = 1/(1 + exp(-logit_mat(i)));
-  nll(i) = -dbinom(Y(i), N(i), mat(i),1); 
+  eta(i) = beta(0) + beta(1)*x(i); 
+  p(i) = 1/(1 + exp(-eta(i)));
+  nll(i) = -dbinom(Y(i), N(i), p(i), true); 
   SIMULATE{
-    Y(i) = rbinom(N(i), mat(i));
+    Y(i) = rbinom(N(i), p(i));
   }
 }
 SIMULATE{
@@ -284,15 +229,46 @@ SIMULATE{
 
 .pull-right[
 ```{r, eval = FALSE}
-mod <- MakeADFun(input$data, input$par, 
-                DLL = "maturity_0")
+set.seed(1) ## optional
 
-opt <- nlminb(mod$par, mod$fn, mod$gr)
-
-y.sim <- mod$simulate()
+obj$simulate(complete = TRUE)
 ```
 *Note*
 * optimization not necessary for simulation
 * not vectorized like in R
 ]
 
+---
+#Simulation Study
+
+.pull-left[
+Set-up Model
+```{r}
+library(TMB)
+dyn.load(dynlib('../src/linReg'))
+sig <- 1
+beta <- c(0.5,2)
+
+Data <- list(y = rep(0,50), 
+             X =  cbind(rep(1,50), 1:50))
+Pars <- list(beta = c(0.5,2),lnSigma = 0)
+obj <- MakeADFun(data = Data, 
+                 parameters = Pars, 
+                 DLL = 'linReg')
+obj$par
+```
+]
+.pull-right[
+Run Simulation
+```{r}
+set.seed(1)
+sim <- replicate(500, {
+  simdata <- obj$simulate(par=obj$par, complete=TRUE)
+  obj2 <- MakeADFun(simdata, Pars, 
+                    DLL="linReg", silent=TRUE)
+  nlminb(obj2$par, obj2$fn, obj2$gr)$par
+})
+obj$par
+apply(t(sim), 2, mean)
+```
+]
