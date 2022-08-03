@@ -11,6 +11,7 @@ sd <- c(1,1,1,2,2)      ## Standard deviation per group
 ## Simulate data
 set.seed(123)
 raggedArray <- lapply(1:ngroup,function(i)rnorm(nrep[i],mu[i],sd[i]))
+str(raggedArray)
 
 ## Prepare data for TMB (ragged array not available):
 obs <- unlist(raggedArray)
