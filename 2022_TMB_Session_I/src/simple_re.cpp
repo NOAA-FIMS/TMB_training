@@ -13,15 +13,22 @@ Type objective_function<Type>::operator() ()
   PARAMETER(lnSDu);      
   PARAMETER(lnSDy);   
 
+  Type nll1 = 0;
+  Type nll2 = 0;
   Type nll = 0;
   Type sdu = exp(lnSDu);
-  nll -= sum(dnorm(u, Type(0), sdu, true));
+  nll1 -= sum(dnorm(u, Type(0), sdu, true));
 
   vector<Type> mu = X * beta + B * u;
   Type sdy = exp(lnSDy);
   for(int i=0; i<y.size(); i++){
-    nll -= keep(i) * dnorm(y(i), mu(i), sdy, true);
+    nll2 -= keep(i) * dnorm(y(i), mu(i), sdy, true);
   }
+
+  nll = nll1 + nll2;
+  REPORT(nll1);
+  REPORT(nll2);
+  REPORT(nll);
 
    return nll;
 }
