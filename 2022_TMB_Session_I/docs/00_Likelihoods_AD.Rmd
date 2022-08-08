@@ -331,8 +331,8 @@ int main(){
   int b = 2;
   double c = 1.1;
   double d = 2.1;
-  int x = add(a,b);
-  double y = add(c,d);
+  int d = add(a,b);
+  double e = add(c,d);
 }
 
 ```
