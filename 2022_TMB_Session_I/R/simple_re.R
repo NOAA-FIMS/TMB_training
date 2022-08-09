@@ -25,7 +25,7 @@ plot(B%*%u, y)
 ## Fit model
 obj <- MakeADFun(data=list(y=y, B=B, X=X),
                  parameters=list(u=u*0, beta=beta*0, lnSDu=1, lnSDy=1),
-                 random="u",
+                 random="u", 
                  DLL="simple_re"
                  )
 opt <- nlminb(obj$par, obj$fn, obj$gr)
@@ -42,3 +42,7 @@ sdr <- sdreport(obj)
 summary(sdr, "fixed")
 summary(sdr, "random")
 sdr$pdHess
+
+sdr$cov.fixed
+#output sparse Hessian
+obj$env$spHess()
