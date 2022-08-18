@@ -4,7 +4,7 @@ template <class Type>
   
 Type objective_function<Type>::operator()()
 {
-  DATA_VECTOR(y;
+  DATA_VECTOR(y);
   DATA_MATRIX(X);
   PARAMETER_VECTOR(beta);
   PARAMETER(lnSigma);
@@ -12,6 +12,7 @@ Type objective_function<Type>::operator()()
   int nll = 0;
   int n = y.size();
   matrix<Type> mu = X * beta;
+  Type sigma = exp(lnSigma);
   for(int i=0; i<n; i++){
     nll -= dnorm(y(i), mu(i), sigma, true);
   }

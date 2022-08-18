@@ -39,10 +39,11 @@ gdbsource("2022_TMB_Session_I/R/debug_gdbsource.R",
           interactive = TRUE)
 
 compile('2022_TMB_Session_I/src/linReg.cpp')
+dyn.load(dynlib('2022_TMB_Session_I/src/linReg'))
 Data <- list(y = c(-2.1, 3.3, 4.2),
-             X = data.frame(c(1,1,1),c(4,5,6))
+             X = cbind(c(1,1,1),c(4,5,6))
 )
-Pars <- list(beta = c(0,0))
+Pars <- list(beta = c(0,0), lnSigma = 0)
 obj <- MakeADFun(data = Data, 
                  parameters = Pars,  
                  DLL = "linReg")
@@ -54,14 +55,14 @@ dyn.unload(dynlib('2022_TMB_Session_I/src/linReg'))
 
 compile("2022_TMB_Session_I/src/debug2.cpp")
 dyn.load(dynlib("2022_TMB_Session_I/src/debug2"))
-Data <- list(y = c(-2.1, 3.3, 4.2),
+Data <- list(y = c(2.1, 3.3, 4.2),
              X = cbind(c(1,1,1),c(4,5,2)))
-Pars <- list(beta = c(0,0), sigma = 0)
+Pars <- list(beta = c(0,0), lnSigma = 0)
 obj <- MakeADFun(data = Data, 
                  parameters = Pars, 
                  DLL = "debug2")
 opt <- nlminb(obj$par, obj$fn, obj$gr)
-
+opt$convergence
 
 dyn.unload(dynlib("2022_TMB_Session_I/src/debug2"))
 
@@ -88,11 +89,14 @@ obj <- MakeADFun(data = Data,
                  DLL = "debug3")
 opt <- nlminb(obj$par, obj$fn, obj$gr)
 opt$message
+opt$iterations
+opt$evaluations
 opt <- nlminb(obj$par, obj$fn, obj$gr, 
               control = list(iter.max = 1000, eval.max = 1000))
 opt$message
 sdr <- sdreport(obj)
 sdr$pdHess
+length(opt$par)
 summary(sdr, "report")
 dyn.unload(dynlib("2022_TMB_Session_I/src/debug3"))
 
@@ -150,4 +154,4 @@ osa1 <- oneStepPredict(obj1, observation.name = "y", method = "fullGaussian")
 qqnorm(osa1$residual);abline(0,1)
 #calculate AIC
 2 * (opt1$objective + length(opt1$par))
-
+plot(X[,2], osa1$residual)

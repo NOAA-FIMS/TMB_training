@@ -14,13 +14,15 @@ Type objective_function<Type>::operator()()
   DATA_MATRIX(X);
   
   PARAMETER_VECTOR(beta);
-  PARAMETER(sigma);
+  PARAMETER(lnSigma);
+  
+  Type sigma = exp(lnSigma);
   
   Type nll = 0;
   vector<Type> mu = X*beta;
 
   for(int i=0; i<y.size(); i++){
-    nll -= dlnorm(y(i), mu(i), sigma);
+    nll -= dlnorm(y(i), mu(i), sigma, true);
   }
   
   
