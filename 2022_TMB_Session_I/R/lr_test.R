@@ -37,6 +37,8 @@ restricted.model1$par
 
 ##Both mu's and sd's restricted to be equal
 map <- list(mu=factor(c(1,1,1,1,1)),sd=factor(c(1,1,1,1,1)))
+map <- list(mu = factor(c(NA, NA, NA, NA, NA)), sd = factor(c(NA, NA, NA, NA, NA)))
+map <- list(mu=factor(c(1 ,2,3,4,5)),sd=factor(c(1,2,3,4,5)))
 restricted.model2 <- MakeADFun(data=list(obs=obs,group=group),
                                parameters=list(mu=rep(0,ngroup),sd=rep(1,ngroup)),
                                DLL="lr_test",
@@ -65,3 +67,4 @@ LRtest(opt.full, opt.r1)
 LRtest(opt.r1,opt.r2)
 
 opt.r1$par
+
