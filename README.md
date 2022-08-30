@@ -22,7 +22,7 @@ A repository for FIMS TMB training
 
 2022 TMB Session II
 
-- [A review of Generalized Linear Mixed Models](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/LVM.html)
+- [A review of Generalized Linear Mixed Models](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/LMV.html)
 
 - [AR1 process and sparsity](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/AR1.html)
 
