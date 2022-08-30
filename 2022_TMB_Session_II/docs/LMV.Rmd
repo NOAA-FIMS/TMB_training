@@ -50,7 +50,7 @@ xaringanExtra::use_tile_view()
 
 
 .column-60[
-```{r, echo = FALSE, out.width="100%", fig.align="left"}
+```{r, echo = FALSE, out.width="90%", fig.align="left"}
 knitr::include_graphics("static/tmb_training_screenshot.png")
 ```
 ]
@@ -100,7 +100,7 @@ Data originate from a process with multiple sources of variability, not all of w
 
 .pull-left[
 <br>
-y = swim speed <br>
+**y = swim speed** <br>
 $\eta = \beta0 + \beta_{1} temp + \beta_{tank}$
 ```{r, echo = FALSE}
 library(knitr)
