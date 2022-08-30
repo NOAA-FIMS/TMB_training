@@ -1,0 +1,247 @@
+---
+title:  "C++ Review"
+subtitle: "TMB Training Session II"
+author: "Andrea Havron<br>NOAA Fisheries, OST"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: ["xaringan-themer.css", "slides-style.css"]
+    lib_dir: libs
+    nature:
+      ratio: '16:9'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc( (%current% - 1) / (%total% - 1) * 100%);">
+          </div>
+        </div>`
+---
+layout: true
+
+.footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
+
+
+<style type="text/css">
+
+code.cpp{
+  font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-tile-view, echo=FALSE}
+# this gives you a tile navigation if you type "O" at any time
+xaringanExtra::use_tile_view()
+```
+
+---
+# C++ and Memory
+
+
+.column-60[
+C++ code
+```{Rcpp, eval = FALSE}
+#include <iostream>
+
+int main() {
+  //initiate a variable
+  float a = 3.1459;
+  //initiate a new variable with the same value as a
+  float b = a;
+  //initiate a variable c that points to the same address as a
+  float* c = &a;
+  std::cout << "c is equal to the address of a; *c = a" << std::endl;
+  std::cout << "c = " << c << std::endl;
+  std::cout << "a = " << a << "; *c = " << *c << std::endl;
+  return 0;
+}
+```
+]
+
+.column-40-left[
+Console output
+```{r, eval = FALSE}
+g++ memoryexample.cpp -o a.exe
+a.exe
+
+c is equal to the address of a; *c = a
+c = 0x78fe14
+a = 3.1459; *c = 3.1459
+```
+]
+
+---
+# C++ and Memory
+
+.column-60[
+C++ code
+```{Rcpp, eval = FALSE}
+#include <iostream>
+
+int main() {
+  //initiate a variable
+  float a = 3.1459;
+  //initiate a new variable with the same value as a
+  float b = a;
+  //initiate a variable c that points to the same address as a
+  float* c = &a;
+  *c = 100;
+  std::cout << "a and *c have been updated; b has not"  << std::endl;
+  std::cout << "a = " << a << "; *c = " << *c << std::endl;
+  std::cout << "b = " << b << std::endl;
+  return 0;
+}
+```
+]
+
+.column-40-left[
+Console output
+```{r, eval = FALSE}
+g++ memoryexample.cpp -o a.exe
+a.exe
+
+a and *c have been updated; b has not
+a = 100; *c = 100
+b = 3.1459
+```
+]
+---
+# C++ and Memory
+
+.column-60[
+C++ code
+```{Rcpp, eval = FALSE}
+#include <iostream>
+
+int main() {
+  //initiate a variable
+  float a = 3.1459;
+  //initiate a new variable with the same value as a
+  float b = a;
+  //initiate a variable c that points to the same address as a
+  float* c = &a;
+  *c = 100;
+  c = &b;
+  b = 10;
+  a = 3;
+  std::cout << "c now equals the address of b" << std::endl;
+  std::cout << "c = " << c << "; &b = " << &b << std::endl;
+  std::cout << "a = " << a << std::endl;
+  std::cout << "b = " << b << std::endl; 
+  std::cout << "*c = " << *c ;
+  return 0;
+}
+```
+]
+
+.column-40-left[
+Console output
+```{r, eval = FALSE}
+g++ memoryexample.cpp -o a.exe
+a.exe
+
+c now equals the address of b
+c = 0x78fe10; &b = 0x78fe10
+a = 3
+b = 10
+ *c = 10
+```
+]
+---
+# Update values using pointers
+
+.column-60[
+C++ code
+```{Rcpp, eval = FALSE}
+#include <iostream>
+#include <cmath>
+
+template <class T>
+  T my_add(T *x, T y){
+    *x += y;
+    return 0;
+}
+template <class T>
+  T my_exp(T *x){
+    *x = std::exp(*x);
+    return 0;
+}
+int main() {
+  //initiate a variable
+  float par = 0;
+  //initiate a new constant used to update par
+  float b = 0.6931472;
+  //intiate a pointer to par
+  float *c = &par;
+  //update par using functions
+  my_add(c, b);
+  std::cout << "par = " << par << std::endl;
+  my_exp(c);
+  std::cout << "par = " << par << std::endl;
+  return 0;
+}
+```
+]
+
+.column-40-left[
+Console output
+```{r, eval = FALSE}
+g++ pointerexample.cpp -o a.exe
+a.exe
+
+par = 0.6931472
+par = 2
+```
+]
+
+---
+# C++ Anatomy of a Class
+
+```cpp
+class ClassName{
+  Access specifier: //can be private, public, or protected
+  Data members; //variables to be used
+  
+  ClassName(){} //Constructor - automatically called when new object created
+  
+  Member functions(){} //Methods to access data members
+  
+}; //class name ends with semicolon
+
+
+//create instance of class
+ClassName<T>* ClassName<T>::instance = new ClassName<T>();
+
+```
+.p[
+- Memory is not allocated when a class is defined
+- An instance of the class needs to be created for memory allocation (new object created)
+- **new** is the C++ initialize function that allocates memory
+- Once the class is instantiated, members can be accessed using the dot('.')
+]
+resources:<br>
+[**geeksforgeeks**](https://www.geeksforgeeks.org/c-classes-and-objects/)<br>
+[**cplusplus**](https://cplusplus.com/doc/tutorial/classes/)
+---
+# TMB and FIMS
+[**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g13fa6bc6e99_0_0)
+```{r, echo = FALSE, out.width="60%", fig.align="left"}
+knitr::include_graphics("static/fims-tmb1.png")
+```
+---
+# TMB and FIMS
+[**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g1405a9bb7f8_0_0)
+```{r, echo = FALSE, out.width="80%", fig.align="left"}
+knitr::include_graphics("static/fims-tmb2.png")
+```

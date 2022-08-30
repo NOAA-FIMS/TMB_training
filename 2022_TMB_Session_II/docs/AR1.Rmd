@@ -1,0 +1,160 @@
+---
+title:  "AR1 process and sparsity"
+subtitle: "TMB Training Session II"
+author: "Andrea Havron<br>NOAA Fisheries, OST"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: ["xaringan-themer.css", "slides-style.css"]
+    lib_dir: libs
+    nature:
+      ratio: '16:9'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc( (%current% - 1) / (%total% - 1) * 100%);">
+          </div>
+        </div>`
+---
+layout: true
+
+.footnote[U.S. Department of Commerce | National Oceanic and Atmospheric Administration | National Marine Fisheries Service]
+
+
+<style type="text/css">
+
+code.cpp{
+  font-size: 14px;
+}
+code.r{
+  font-size: 14px;
+}
+
+
+</style>
+
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-tile-view, echo=FALSE}
+# this gives you a tile navigation if you type "O" at any time
+xaringanExtra::use_tile_view()
+```
+
+---
+# AR1 process
+.large[
+1st-order Autoregressive based on equal time steps
+] 
+
+.pull-left[
+\begin{align}
+x_{t+1} &\sim N(\rho x_{t}, \sigma_{x})\\
+y &\sim f(g^{-1}(x))
+\end{align}
+]
+
+.pull-right[
+\begin{align}
+x_{t+2} \perp  x_{t} &| x_{t+1}  \\
+y \sim iid. &| x
+\end{align}
+]
+
+<br>
+
+```{r, echo = FALSE, , out.width="45%", fig.align="center"}
+knitr::include_graphics("static/state-space-dag.png")
+```
+
+---
+# AR1 as Multivariate Normal
+<br>
+
+$$x \sim MVN(0, \Sigma)$$
+<br>
+
+\begin{align}
+E[x] &= 0 \\
+Var[x] &= \frac{\sigma^{2}_{x}}{1-\rho^{2}} \\
+Corr[x_{t}, x_{t+1}] &= \rho \\
+Corr[x_{t}, x_{t+h}] &= \rho^{h} \\
+Cov[x_{t}, x_{t+h}] &=  \frac{\sigma^{2}_{x}}{1-\rho^{2}}\rho^{h}
+\end{align}
+
+---
+# Dense Covariate Matrix
+
+
+.pull-left[	
+<br>
+<br>
+$$\Sigma = \frac{\sigma^{2}}{1-\rho^{2}} \begin{bmatrix}
+1&\rho&\rho^{2}&\rho^{3}&\rho^{4}\\
+\rho&1&\rho&\rho^2&\rho^{3} \\
+\rho^{2}&\rho&1&\rho&\rho^{2}\\
+\rho^{3}&\rho^{2}&\rho&1&\rho \\
+\rho^{4}&\rho^{3}&\rho^{2}&\rho&1
+\end{bmatrix}$$
+
+]
+
+.pull-right[
+```{r, echo = FALSE, message = FALSE, results = FALSE, out.width="65%", fig.align="center"}
+library(INLA)
+TMB::runExample("thetalog")
+obj <- MakeADFun(data, parameters, random=c("X"), DLL="thetalog")
+Matrix::image(solve(obj$env$spHess(random=TRUE)))
+```
+]
+
+$$L(x) = \frac{det(\Sigma)^{-1/2}}{\sqrt{2\pi}^{n}}exp\big(x^{T}\Sigma^{-1}x\big)$$
+---
+#Sparse Precision Matrix
+
+.pull-left[
+<br>
+<br>
+$$Q = \Sigma^{-1} = \frac{1}{\sigma^{2}} \begin{bmatrix}
+1+\rho^{2}&-\rho&\cdot&\cdot&\cdot\\
+-\rho&1+\rho^{2}&-\rho&\cdot&\cdot \\
+\cdot&\rho&1+\rho^{2}&-\rho&\cdot\\
+\cdot&\cdot&-\rho&1+\rho^{2}&-\rho \\
+\cdot&\cdot&\cdot&-\rho&1+\rho^{2}
+\end{bmatrix}$$
+]
+
+.pull-right[
+```{r, echo = FALSE, message = FALSE, results = FALSE, out.width="65%", fig.align="center"}
+TMB::runExample("thetalog")
+obj <- MakeADFun(data, parameters, random=c("X"), DLL="thetalog")
+Matrix::image(obj$env$spHess(random=TRUE))
+```
+]
+
+$$L(x) = \frac{det(Q)^{1/2}}{\sqrt{2\pi}^{n}}exp\big(x^{T}Qx\big)$$
+---
+# TMB Example
+From Jim Thorson's [TMB spatio-temporal course](https://github.com/James-Thorson/2018_FSH556), 2018: [autoregressive.cpp](https://github.com/James-Thorson/2018_FSH556/blob/master/Week%205%20--%201D%20spatial%20models/Lecture/autoregressive_V1.cpp)<br>
+
+Model AR1 random effect using five different methods
+
+1. Conditional Independence
+ - $x_{t+1} \sim N(\rho x_{t}, \sigma_{x})$
+2. Analytic Precision
+ - define Q
+ - $dmvnorm(x,0,Q)$
+3. Built-in GMRF
+ - define Q
+ - $SCALE( GMRF( Q ), \sqrt{\sigma^2} )( u )$ 
+4. Covariance and MVNORM
+ - define $\Sigma$
+ - $MVNORM(\Sigma)( u )$
+5. Built-in AR1
+ - $SCALE( AR1(\rho),  \sqrt{\sigma^{2} / (1-\rho^2)} )(x)$
+
+
