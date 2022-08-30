@@ -19,3 +19,11 @@ A repository for FIMS TMB training
 - [Debugging](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/03_Debugging_I.html)
 
 - [Modular TMB Example](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_I/docs/04_Modular_TMB.html)
+
+2022 TMB Session II
+
+- [A review of Generalized Linear Mixed Models](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/LVM.html)
+
+- [AR1 process and sparsity](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/AR1.html)
+
+- [C++ Review](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/Cpp Review.html)
