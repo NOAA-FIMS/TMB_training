@@ -319,7 +319,7 @@ Figure from [Albertsen, C. M. (2018), 2.3.1](https://backend.orbit.dtu.dk/ws/por
 
 Changes the problem from integration to optimization &lt;br&gt;
 
-The marginal likelihood of the data after integrating out random effects, `\(u\)`: 
+The marginal likelihood of the parameters after integrating out random effects, `\(u\)`: 
 `$$L(\theta) = \int_{\mathbb{R}}f(y,u;\theta)f(u;\theta)du$$`
 1. The random effects likelihood is minimized to find `\(\hat{u}\)`:
 `$$\hat{u}(\theta) = \underset{u}{argmin}f(u,\theta)$$`
@@ -334,7 +334,7 @@ If `\(y_{i}\)` is only dependent on `\(u_{i}\)`, then the likelihood function is
 
 `\begin{align}
 L(\theta) &amp;= \int_{\mathbb{R}^{n}}f(y,u;\theta)du\\
-&amp;= \prod^{n}_{i=1}f(y_{i}, u_{i};\theta)du
+&amp;= \prod^{n}_{i=1}\int f(y_{i}, u_{i};\theta)du_{i}
 \end{align}`
 
 The marginal likelihood can be evaluated as a series of univariate Laplace approximations:
@@ -418,8 +418,7 @@ Sparse spatial model run time (min)
 - Classes are specified in the density namespace
 - Note NEGATIVE log-likelihoos ia returned
 
-&lt;br&gt;
-**Density functions** 
+**Density functions** &lt;br&gt;
 [**AR1**](https://kaskr.github.io/adcomp/classdensity_1_1AR1__t.html) `\(\quad\quad\quad\quad~~\)` `\(\text{class density::AR1_t&lt;distribution&gt;}\)`
 - Class to evaluate the negative log density of a (multivariate) AR1 process with parameter phi and given marginal distribution.
   
