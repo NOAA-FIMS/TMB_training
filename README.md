@@ -27,3 +27,7 @@ A repository for FIMS TMB training
 - [AR1 process and sparsity](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/AR1.html)
 
 - [C++ Review](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/Cpp-Review.html)
+
+- [Uncertainty and Bias Correction](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/Diagnostics.html)
+
+- [TMB Validation](https://noaa-fims.github.io/TMB_training/2022_TMB_Session_II/docs/TMBvalidation.html)
