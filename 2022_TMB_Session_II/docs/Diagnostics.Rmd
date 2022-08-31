@@ -106,14 +106,6 @@ knitr::include_graphics("static/tweedie-map.png")
 
 ]
 ---
-
-
-class: middle
-
-#Uncertainty
-
-
----
 #Estimating Uncertainty<br><br>
 
 Uncertainty estimates can be calculated in several ways with TMB
@@ -159,52 +151,64 @@ knitr::include_graphics("static/omega-confint.png")
 ]
 ---
 # Lkelihood Profiles
+<br>
+.pull-left[
 * Does not make the asymptotic normal assumption
-* Refit model at series of at fixed values for parameter of interest and CI determined by the quantile of a $\chi^2$ with 1 degree of freedom at p = 0.95 (divided by 2 because 2*log-likelihood difference assymptotically has this distribution). 
-* A good (but slower) approach that works better when likelihood profile is asymmetric.
+* Refit model at series of fixed values for parameter of interest 
+* Calculate likelihood ratio tests between optimum and re-evaluated likelihoods
+* The 95% LRCI is the point at which the log-likelihoods decreases by 1.92
+* A good (but slower) approach that works better when likelihood profile is asymmetric
+\begin{align}
+LRT &\sim \chi^2_{df=1, 0.95}\\ 
+\chi^{2}_{1,0.95} &\approx 3.84\\
+3.84/2 &= 1.92
+\end{align}
+]
+.pull-right[
+```{r, echo = FALSE, out.width="100%", fig.align="left"}
+knitr::include_graphics("static/millar-profile.png")
+```
+.small[source: Millar, R.B. 2011. Maximum likelihood estimation and inference, pg. 59]
+]
 
+---
+# Likelihood Profiles
+<br>
 .pull-left[
 * Easy to do in TMB: 
 ```{r, eval = FALSE}
 #profile beta0
-prof <- TMB::tmbprofile(mod, 1)
+prof <- TMB::tmbprofile(obj, "ln_sigma2")
 plot(prof)
 confint(prof)
 ```
 * plot(prof) and confint(prof) plot and give 95% range
-* This interval may not be symmetic nor finite
-* See [maturity_bb.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb.R)
+* This interval may not be symmmetic nor finite
 ]
 .pull-right[
 ```{r, echo = FALSE, out.width="100%", fig.align="center"}
-knitr::include_graphics("static/log_phi_profile.png")
+knitr::include_graphics("static/ln_sigma2_profile.png")
 ```
 ]
----
-class: middle
-
-
----
-class: middle
-
-#Model Diagnostics
 
 ---
 
 #Checking the Laplace Approximation
-* For mixed effects models, TMB allows one to test whether the the Laplace approximation of the marginal log-likelihood and joint log-likelihood is ok. 
-$$E \nabla_{\theta} P(X|\theta)= 0$$
-$$E \nabla_{\theta,u} P(X,U|\theta)= 0$$
-* Simulate data and calculate gradients for each simulated data set
+* For mixed effects models, TMB allows one to test whether the the Laplace approximation of the marginal log-likelihood and joint log-likelihood is ok.
+
+\begin{align}
+E [\nabla_{θ}f(y,u;\theta)] = 0\\
+E [\nabla_{θ}  \int f(y,u))du ] = 0
+\end{align}
+* Simulate data and calculate gradients $(\nabla_{\theta})$ for each simulated data set
 * Average gradient should be $0$ when the Laplace approximation is ok
 ```{r, eval = FALSE}
-check <- TMB::checkConsistency(mod)
+check <- TMB::checkConsistency(obj)
 summary(check)
 ```
 * performs $\chi^2$ test for gradient bias for marginal and joint
 * provides estimates of bias for fixed effects parameters
 * increasing sample sizes will increase power of $\chi^2$ test for (small) bias 
-* See [maturity_bb_re.R](https://github.com/NOAA-FIMS/TMB_training/blob/main/maturity_examples/maturity_bb_re.R)
 ---
 
 # Quantile Residuals<br>

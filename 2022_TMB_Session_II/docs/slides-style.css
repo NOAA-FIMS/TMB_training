@@ -17,6 +17,9 @@
   --peach-quartz-30: #F5B89530;
   --cornhusk: #F4DBB3;
   --cornhusk-30: #F4DBB330;
+  --grey20: #333333;
+  --grey80: #cccccc;
+  --black #000000
 }
 
 
@@ -131,11 +134,24 @@ h1, h2, h3 {
   clear: both;
 }
 
-  /*Left 30% - Right 70% */
+/*Left 30% - Right 70% */
 .pull-left-narrow {
   width: 30%;
   float: left;
 }
+/*Left 25% - Right 75% */
+.pull-left-extra-narrow {
+  width: 25%;
+  float: left;
+}
+.pull-right-extra-wide {
+  width: 72%;
+  float: right;
+}
+.pull-right-extra-wide ~ * {
+  clear: both;
+}
+
 .pull-right-wide {
   width: 67%;
   float: right;
@@ -237,7 +253,7 @@ ul{
 
 
 /* Custom boxes */
-.bluebox, .yellowbox, .orangebox {
+.bluebox, .yellowbox, .orangebox,  {
   padding: 5px 5px;
   margin-top: 5px;
   margin-bottom: 5px;
@@ -253,6 +269,18 @@ ul{
   color: var(--monument);
   margin-bottom: 10px;
   margin-top: 2px;
+}
+.grey80box{
+  border-left: solid 5px var(--grey80);
+  background-color: var(--grey80);
+}
+.grey80box h2{
+  font-size: 100%;
+  font-weight: normal;
+  font-style: normal;
+  color: var(--black);
+  margin-bottom: 1px;
+  margin-top: 1px;
 }
 .yellowbox {
   border-left: solid 5px var(--cornhusk);
