@@ -235,6 +235,7 @@ resources:<br>
 [**cplusplus**](https://cplusplus.com/doc/tutorial/classes/)
 ---
 # Class Example
+
 C++ code
 .pull-left[
 ```{Rcpp, eval = FALSE}
