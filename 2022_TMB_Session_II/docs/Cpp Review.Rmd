@@ -234,6 +234,48 @@ resources:<br>
 [**geeksforgeeks**](https://www.geeksforgeeks.org/c-classes-and-objects/)<br>
 [**cplusplus**](https://cplusplus.com/doc/tutorial/classes/)
 ---
+# Class Example
+C++ code
+.pull-left[
+```{Rcpp, eval = FALSE}
+#include <iostream>
+
+template <class T>
+class MyClass{
+    public:
+    T a;
+    T b;
+    MyClass(){}
+    T evaluate(){
+        return a + b;
+    }
+};
+int main() {
+  //initiate class
+  MyClass<double> *m = new MyClass<double>();
+  m -> a = 1.2;
+  m -> b = 3.4;
+  std::cout << m -> evaluate() << std::endl;  
+  //intiate class
+  MyClass<double> myclass;
+  myclass.a = 2;
+  myclass.b = 3;
+  std::cout << myclass.evaluate() << std::endl;
+  return 0;
+}
+```
+]
+.pull-right[
+Console output
+```{r, eval = FALSE}
+g++ classexample.cpp -o a.exe
+a.exe
+
+4.6
+5
+```
+]
+---
 # TMB and FIMS
 [**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g13fa6bc6e99_0_0)
 ```{r, echo = FALSE, out.width="60%", fig.align="left"}
@@ -244,4 +286,134 @@ knitr::include_graphics("static/fims-tmb1.png")
 [**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g1405a9bb7f8_0_0)
 ```{r, echo = FALSE, out.width="80%", fig.align="left"}
 knitr::include_graphics("static/fims-tmb2.png")
+```
+---
+
+# Modular TMB structure: C++ code
+.pull-left[
+Common.hpp - setup TMB dependencies and define data types
+```{Rcpp, eval = FALSE}
+#include <TMB.hpp>
+using namespace tmbutils;
+using namespace density;
+//#include "tmbutils_extra.hpp"
+//#include <Rcpp.h>
+//using namespace Rcpp;
+
+template<typename Type>
+struct model_traits{
+ typedef typename CppAD::vector<Type> data_vector;
+ typedef data_indicator<tmbutils::vector<Type> , Type>  data_indicator;
+ typedef typename tmbutils::array<Type> array;
+};
+```
+]
+.pull-right[
+```{Rcpp, eval = FALSE}
+#include "Common.hpp"
+template<class Type>
+class ar1xar1{
+  
+  using DataVector = typename model_traits<Type>::data_vector;
+  using DataIndicator = typename model_traits<Type>::data_indicator;
+  using ParameterArray = typename model_traits<Type>::array
+  
+  public:
+  DataVector  y;
+  DataIndicator keep;
+
+  ParameterArray eta;
+  Type phi1;
+  Type phi2;
+  static ar1xar1<Type>* instance;
+  
+  ar1xar1(){}
+  
+  static ar1xar1<Type>* getinstance(){
+    return ar1xar1<Type>::instance;
+  }
+  
+  ...
+```
+  ]
+---
+# Modular TMB structure: C++ code
+.pull-left[
+Common.hpp - setup TMB dependencies and define data types
+```{Rcpp, eval = FALSE}
+#include <TMB.hpp>
+using namespace tmbutils;
+using namespace density;
+//#include "tmbutils_extra.hpp"
+//#include <Rcpp.h>
+//using namespace Rcpp;
+
+template<typename Type>
+struct model_traits{
+ typedef typename CppAD::vector<Type> data_vector;
+ typedef data_indicator<tmbutils::vector<Type> , Type>  data_indicator;
+ typedef typename tmbutils::array<Type> array;
+};
+```
+]
+.pull-right[
+```{Rcpp, eval = FALSE}
+#include "Common.hpp"
+template<class Type>
+class ar1xar1{
+  ...
+  Type evaluate(){
+    Type nll = 0;
+    vector<Type> ln_lambda(y.size());
+    nll += SEPARABLE( AR1(phi2), AR1(phi1) )(eta);
+    for(int i=0; i < y.size(); i++){
+      nll -= keep[i] * dpois(y[i], exp(eta[i]), true);
+      Type cdf = squeeze( ppois(y[i], exp(eta[i])) );
+      nll -= keep.cdf_lower[i] * log( cdf );       // NaN protected
+      nll -= keep.cdf_upper[i] * log( 1.0 - cdf ); // NaN protected
+    }
+
+    return nll;
+  }
+
+};
+template<class Type>
+ar1xar1<Type>* ar1xar1<Type>::instance = new ar1xar1<Type>();
+```
+]
+---
+# Modular TMB structure: TMB model
+```{Rcpp, eval = FALSE}
+template<class Type>
+Type objective_function<Type>::operator() ()
+{
+
+  ar1xar1<Type>* inst = ar1xar1<Type>::getinstance();
+  
+  DATA_VECTOR(y); 
+  DATA_VECTOR_INDICATOR(keep,y);
+  PARAMETER_ARRAY(eta);
+  PARAMETER(transf_phi1); Type phi1 = f(transf_phi1);
+  PARAMETER(transf_phi2); Type phi2 = f(transf_phi2);
+  
+  inst->y = y;
+  inst->keep = keep;
+  inst->phi1 = phi1;
+  inst->phi2 = phi2;
+  inst->eta = eta;
+  
+  Type nll = inst -> evaluate();
+
+  SIMULATE{
+    SEPARABLE(AR1(phi2), AR1(phi1)).simulate(eta);
+    vector<Type> ln_lambda = eta;//convert array to vector for rpois simulation
+    y = rpois(exp(ln_lambda));//rpois cannot accept array 
+    REPORT(eta);
+    REPORT(y);
+  }
+  ADREPORT(phi1);
+  ADREPORT(phi2);
+
+  return nll;
+}
 ```
