@@ -1,4 +1,5 @@
 #package dependencies: mvtnorm
+#install.packages("mvtnorm")
 library(ggplot2)
 
 # Matern covariance function 
@@ -128,7 +129,9 @@ ggplot(df, aes(x = est, y = type )) +
 
 
 ## Profile Likelihood ==================================
-prof <- TMB::tmbprofile(obj, "ln_sigma2")
+# prof <- TMB::tmbprofile(obj, "ln_sigma2")
+# save(prof, file = "2022_TMB_Session_II/R/prof.RData")
+load("2022_TMB_Session_II/R/prof.RData")
 plot(prof);abline(v = log(sig2))
 confint(prof)
 #compare to asymptotic confint

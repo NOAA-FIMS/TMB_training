@@ -73,5 +73,5 @@ ecdf.uncond.h1 <- DHARMa::createDHARMa(sim.y, y, rotation = "estimated")
 gap::qqunif(ecdf.cond.h0$scaledResiduals, logscale = FALSE);abline(0,1)
 gap::qqunif(ecdf.uncond.h0$scaledResiduals, logscale = FALSE);abline(0,1)
 #Mis-specified model
-gap::qqunif(ecdf.cond.h0$scaledResiduals, logscale = FALSE);abline(0,1)
-gap::qqunif(ecdf.uncond.h0$scaledResiduals, logscale = FALSE);abline(0,1)
+gap::qqunif(ecdf.cond.h1$scaledResiduals, logscale = FALSE);abline(0,1)
+gap::qqunif(ecdf.uncond.h1$scaledResiduals, logscale = FALSE);abline(0,1)
