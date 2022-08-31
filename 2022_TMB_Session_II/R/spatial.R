@@ -32,7 +32,7 @@ ggplot(df, aes(x=x, y=y, fill = omega)) +
   geom_tile() +
   scale_fill_gradient2() +
   theme_classic()
-dev.off()
+
 ## Simulate Tweedie weights
 mu  <- as.vector(exp(beta0 + omega))
 y <- tweedie::rtweedie(nrow(loc_xy), mu = mu, 
@@ -74,17 +74,24 @@ obj <- TMB::MakeADFun(
 opt <- nlminb(obj$par, obj$fn, obj$gr)
 report <- obj$report()
 
-## explicitly calculate the laplace approximation
-Hess <- obj$env$spHess(random = TRUE)
+## analytical calculation of the laplace approximation
+# extract Hessian
+Hess <- obj$env$spHess(obj$env$last.par.best, random = TRUE)
+# extract joint likelihood
 joint.nll <- report$nll
-#log laplace approximation
--0.5 * log(2*pi)*length(y) + 0.5*log(det(as.matrix(Hess))) + joint.nll
--0.5 * log(2*pi)*length(y) + 0.5*sum(log(diag(as.matrix(Hess)))) + joint.nll
+#is infinite
+log(det(as.matrix(Hess)))
+# use log(det(C)) = 2trace(log(L)) instead, where C = LL^T
+L <- chol(Hess)
+logdetH <- 2*sum(log(diag(L)))
+-0.5 * log(2*pi)*length(y) + 0.5*logdetH + joint.nll
 opt$objective
 
 
 ## check laplace approximation ===================
-chk <- checkConsistency(obj)
+# chk <- checkConsistency(obj)
+# save(chk, file = "2022_TMB_Session_II/R/chk.RData")
+load("2022_TMB_Session_II/R/chk.RData")
 summary(chk)
 
 
@@ -100,10 +107,9 @@ sdr <- sdreport(obj, bias.correct = TRUE,
 cbind(summary(sdr, "report"),  true = total_weight)
 
 #Bias without bias correction
-summary(sdr, "report")[1] - total_weight
-#Bias eith bias correction
-summary(sdr, "report")[3] - total_weight
-
+as.list(sdr, "Estimate", report = TRUE)$Total - total_weight
+#Bias with bias correction
+as.list(sdr, "Est. (bias.correct)", report = TRUE)$Total - total_weight
 
 conf.lower <- c(summary(sdr, "report")[c(1,3)]) - 
   1.96 * c(summary(sdr, "report")[c(2,4)])
@@ -119,3 +125,20 @@ ggplot(df, aes(x = est, y = type )) +
   geom_vline(aes(xintercept = total_weight), col = 'red', show.legend = TRUE) +
  scale_color_manual(name = "", values = c(true = "red")) +
   theme_classic() + xlab('total weight')
+
+
+## Profile Likelihood ==================================
+prof <- TMB::tmbprofile(obj, "ln_sigma2")
+plot(prof);abline(v = log(sig2))
+confint(prof)
+#compare to asymptotic confint
+est <- as.list(sdr, "Estimate")$ln_sigma2
+se <- as.list(sdr, "Std. Error")$ln_sigma2
+asymp.ci <- est + c(-1,1)* qnorm(.975)* se
+rbind(confint(prof),asymp.ci)
+par(mfrow = c(1,2))
+plot(prof);abline(v = log(sig2))
+curve(-dnorm(x,est, se), asymp.ci[1], asymp.ci[2])
+abline(v = asymp.ci[1], lty = 3)
+abline(v = log(sig2))
+abline(v = asymp.ci[2], lty = 3)
