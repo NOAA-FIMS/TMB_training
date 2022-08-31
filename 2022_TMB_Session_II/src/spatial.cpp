@@ -35,16 +35,13 @@ template<class Type>
   }
   
   vector<Type> mu = exp(beta0 + omega);
-  //nll -= sum(dpois(y, lambda, true));
   Type nll_y = -sum(dtweedie(y, mu, phi, power, true));
   SIMULATE{
-    //y = rpois(lambda);
     y = rtweedie(mu, phi, power);
     REPORT(y);
   }
   
-  //Type Total_Abundance = lambda.sum();
-  Type Total_Abundance = mu.sum();
+  Type Total_Weight = mu.sum();
   
   Type nll = nll_omega + nll_y;
   
@@ -55,8 +52,9 @@ template<class Type>
   REPORT(nll_omega);
   REPORT(nll_y);
   REPORT(nll);
+  REPORT(C);
  
-  ADREPORT(Total_Abundance);
+  ADREPORT(Total_Weight);
   
   return nll;
 }
