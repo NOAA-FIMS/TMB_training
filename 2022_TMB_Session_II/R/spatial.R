@@ -1,6 +1,7 @@
 #package dependencies: mvtnorm
 #install.packages("mvtnorm")
 library(ggplot2)
+library(TMB)
 
 # Matern covariance function 
 cMatern <- function(H, Nu, R) {
@@ -82,6 +83,7 @@ Hess <- obj$env$spHess(obj$env$last.par.best, random = TRUE)
 joint.nll <- report$nll
 #is infinite
 log(det(as.matrix(Hess)))
+# trace = sum(diag(C))
 # use log(det(C)) = 2trace(log(L)) instead, where C = LL^T
 L <- chol(Hess)
 logdetH <- 2*sum(log(diag(L)))
