@@ -53,20 +53,20 @@ qqnorm(osa.fg.h1$residual);abline(0,1)
 #Only simulate from data model
 set.seed(123)
 obj0$env$data$sim_re <- 0
-sim.y <- replicate(100, {obj0$simulate()$y})
+sim.y <- replicate(1000, {obj0$simulate()$y})
 ecdf.cond.h0 <- DHARMa::createDHARMa(sim.y, y)
 
 obj1$env$data$sim_re <- 0
-sim.y <- replicate(100, {obj1$simulate()$y})
+sim.y <- replicate(1000, {obj1$simulate()$y})
 ecdf.cond.h1 <- DHARMa::createDHARMa(sim.y, y)
 
 #Simulate from data and RE model
 obj0$env$data$sim_re <- 1
-sim.y <- replicate(100, {obj0$simulate()$y})
+sim.y <- replicate(1000, {obj0$simulate()$y})
 ecdf.uncond.h0 <- DHARMa::createDHARMa(sim.y, y, rotation = "estimated")
 
 obj1$env$data$sim_re <- 1
-sim.y <- replicate(100, {obj1$simulate()$y})
+sim.y <- replicate(1000, {obj1$simulate()$y})
 ecdf.uncond.h1 <- DHARMa::createDHARMa(sim.y, y, rotation = "estimated")
 
 #Correctly specified model
