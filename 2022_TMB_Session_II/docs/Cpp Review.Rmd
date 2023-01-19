@@ -224,12 +224,13 @@ class ClassName{
 ClassName<T>* ClassName<T>::instance = new ClassName<T>();
 
 ```
-.p[
 - Memory is not allocated when a class is defined
 - An instance of the class needs to be created for memory allocation (new object created)
-- **new** is the C++ initialize function that allocates memory
-- Once the class is instantiated, members can be accessed using the dot('.')
-]
+- **new** is the C++ initialize function that allocates memory (creates pointer)
+- Once the class is instantiated, members can be accessed using
+ - the dot(**.**) when class is declared
+ - the pointer(**->**) when an instance of the class is created using **new**
+
 resources:<br>
 [**geeksforgeeks**](https://www.geeksforgeeks.org/c-classes-and-objects/)<br>
 [**cplusplus**](https://cplusplus.com/doc/tutorial/classes/)
@@ -252,12 +253,12 @@ class MyClass{
     }
 };
 int main() {
-  //initiate class
+  //initiate class with pointer
   MyClass<double> *m = new MyClass<double>();
   m -> a = 1.2;
   m -> b = 3.4;
   std::cout << m -> evaluate() << std::endl;  
-  //intiate class
+  //intiate class with declaration
   MyClass<double> myclass;
   myclass.a = 2;
   myclass.b = 3;
@@ -277,6 +278,276 @@ a.exe
 ```
 ]
 ---
+# Modular TMB structure: .hpp files
+.pull-left[
+[interface.hpp](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/include/interface/interface.hpp) - setup TMB dependencies and define data types
+```{Rcpp, eval = FALSE}
+#ifdef TMB_MODEL
+#include <TMB.hpp>
+
+template<typename T>
+struct ModelTraits{
+ typedef typename CppAD::vector<Type> DataVector;
+ typedef typename CppAD::vector<T> ParameterVector;
+ typedef typename tmbutils::vector<T> EigenVector;
+};
+
+#endif /* TMB_MODEL */
+```
+]
+.pull-right[
+[test_dnorm_distribution.hpp](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/extdata/TMB_tests/distributions/test_dnorm_distribution.hpp) - model
+```{Rcpp, eval = FALSE}
+#include "interface.hpp"
+#include "distributions.hpp"
+
+template<typename T>
+class Model{
+  
+  using DataVector = typename ModelTraits<T>::DataVector;
+      
+  public:
+  DataVector y; /*!< observation */
+  T mean;  /*!< mean of the normal distribution */
+  T sd; /*!< standard deviation of the normal distribution, must be strictly positive.*/
+
+  // Initiate pointer to link .cpp to .hpp
+  static Model<T>* instance;
+
+  /** @brief Constructor.*/
+  Model(){}
+
+  // @brief Create new singleton class
+  // @return Model<T>* 
+  static Model<T>* getInstance(){
+    return Model<T>::instance;
+  }
+  ...
+```
+  ]
+---
+# Modular TMB structure: .hpp files
+.pull-left[
+[test_dnorm_distribution.hpp](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/extdata/TMB_tests/distributions/test_dnorm_distribution.hpp) - model
+```{Rcpp, eval = FALSE}
+#include "interface.hpp"
+#include "distributions.hpp"
+namespace fims {
+template<typename T>
+class Model{
+  
+  using DataVector = typename ModelTraits<T>::DataVector;
+      
+  public:
+  DataVector y; /*!< observation */
+  T mean;  /*!< mean of the normal distribution */
+  T sd; /*!< standard deviation of the normal distribution, must be strictly positive.*/
+
+  // Initiate pointer to link .cpp to .hpp
+  static Model<T>* instance;
+
+  /** @brief Constructor.*/
+  Model(){}
+
+  // @brief Create new singleton class
+  // @return Model<T>* 
+  static Model<T>* getInstance(){
+    return Model<T>::instance;
+  }
+  ...
+```
+]
+.pull-right[
+<br>
+```{Rcpp, eval = FALSE}
+  // @brief Function that calculates the negative log-likelihood given the data and parameters
+  // @return negative log-likelihood (nll)
+  T evaluate(){
+    T nll = 0;
+    int i;
+    int n = y.size();
+    fims::Dnorm<T> nll_dnorm;
+    nll_dnorm.mean = mean;
+    nll_dnorm.sd = sd;
+    for(i =0; i < n; i++){
+      nll_dnorm.x = y[i];
+      nll -= nll_dnorm.evaluate(true);
+    }
+    return nll;
+  }
+};
+
+  // @brief Create new instance of Model
+  // @tparam T 
+  template<class T>
+  Model<T>* Model<T>::instance = new Model<T>();
+}}
+```
+]
+---
+# Modular TMB structure: .cpp file
+[test_dnorm_distribution.cpp](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/extdata/TMB_tests/distributions/test_dnorm_distribution.cpp) - model
+```{Rcpp, eval = FALSE}
+#include "test_dnorm_distribution.hpp"
+
+template<class Type>
+Type objective_function<Type>::operator()(){
+  // create pointer, inst, that points to singleton class of Model in test_dnorm_distribution.hpp
+  //getinstance is defined in test_dnorm_distribution.hpp
+  fims::Model<Type>* inst = fims::Model<Type>::getInstance();
+
+  DATA_VECTOR(y);
+  PARAMETER_VECTOR(p);
+  Type mean = p[0];
+  Type sd = exp(p[1]);
+
+  // access and assign members of Model class using inst pointer
+  inst -> y = y;
+  inst -> mean = mean;
+  inst -> sd = sd;
+
+  // create Type nll and assign value to the return of the 
+  // evaluate() function defined in test_dnorm_distribution.hpp
+  Type nll = inst -> evaluate();
+  return nll;
+}
+```
+
+---
+# Modular TMB structure: R unit test
+From [test_distributions.R](https://github.com/NOAA-FIMS/FIMS/blob/main/inst/extdata/TMB_tests/distributions/test_distributions.R)
+```{r, eval = FALSE}
+library(testthat)
+library(TMB)
+
+# Compile code with TMB_MODEL defined
+TMB::compile(paste0(path, "/test_dnorm_distribution.cpp"), flags = "-DTMB_MODEL")
+
+# dnorm unit test
+# load test
+dyn.load(dynlib(paste0(path, "/test_dnorm_distribution")))
+
+#Simulate new data with R
+set.seed(123)
+y = rnorm(10, 5, 3)
+
+# Calculate negative log-likelihood with R dnorm
+nll = -sum(stats::dnorm(y, 5,3, TRUE))
+
+# Initialize TMB model object with true values
+mod = MakeADFun(data = list(y =y),
+                parameters = list(p = c(5, log(3))),
+                DLL = "test_dnorm_distribution")
+
+# Compare R nll to TMB nll
+expect_equal(nll, mod$fn())
+```
+---
+# Rcpp Interface
+.pull-left[
+[Matthew's example](https://github.com/NOAA-FIMS/ModularTMBExample) using a vonBertalanffy model
+```{Rcpp, eval = FALSE}
+
+class Variable{
+public:
+    static std::vector<Variable*> parameters;
+    bool estimable = FALSE;
+    double value = 0;
+    
+    Variable(){
+      Variable::parameters.push_back(this);
+    }
+    
+};
+
+std::vector<Variable*> Variable::parameters;
+
+// Returns the initial values for the parameter set
+Rcpp::NumericVector get_parameter_vector(){
+  Rcpp::NumericVector p;
+    
+  for(int i = 0; i < Variable::parameters.size(); i++){
+    if(Variable::parameters[i]->estimable){
+        p.push_back(Variable::parameters[i]->value);
+    }
+  }
+  return p;
+}
+```
+]
+
+.pull-right[
+TMB model, .cpp file
+```{Rcpp, eval = FALSE}
+template<typename Type>
+Type objective_function<Type>::operator()(){
+    
+    //get the singleton instance for type Type
+    vonBertalanffyInterface::instance->prepare_template<Type>();
+    VonBertalanffyModel<Type>* model =
+        VonBertalanffyModel<Type>::getInstance();
+    
+    //get the parameter values
+    PARAMETER_VECTOR(p)
+    
+    //update the parameter values for type Type
+    for(int i =0; i < model->parameters.size(); i++){
+        *model->parameters[i] = p[i];
+    }
+    
+    //evaluate the model objective function value
+    return model->evaluate();
+}
+```
+]
+---
+#Rcpp Interface, calling from R
+.pull-left[
+```{r, eval = FALSE}
+#get the Rcpp module
+g <- Rcpp::Module(module = "growth",
+                  PACKAGE = "ModularTMBExample")
+vonB<-new(g$vonBertalanffy)
+
+#initialize k
+vonB$k$value<-.05
+vonB$k$estimable<-TRUE
+
+#initialize a_min
+vonB$a_min$value<-.01
+vonB$a_min$estimable<-FALSE
+
+#initialize l_inf
+vonB$l_inf$value<-7
+vonB$l_inf$estimable<-TRUE
+
+#set data
+vonB$data <-data
+
+#set ages 
+vonB$ages<-ages
+
+#prepare for interfacing with TMB
+vonB$prepare()
+```
+]
+
+.pull-right[
+```{r, eval = FALSE}
+#create an empty data list (data set above)
+data <- list()
+
+#create a parameter list
+parameters <- list(
+  p = g$get_parameter_vector()
+)
+
+#Run TMB
+obj <- MakeADFun(data, parameters, DLL="ModularTMBExample")
+opt <- nlminb(obj$par, obj$fn, obj$gr)
+```
+]
+---
 # TMB and FIMS
 [**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g13fa6bc6e99_0_0)
 ```{r, echo = FALSE, out.width="60%", fig.align="left"}
@@ -287,134 +558,4 @@ knitr::include_graphics("static/fims-tmb1.png")
 [**fimsflow**](https://docs.google.com/presentation/d/1U8N6J6YQIdd0Wer-o5vZvGTHgw1GLA8_6a0r8sYfqXo/edit#slide=id.g1405a9bb7f8_0_0)
 ```{r, echo = FALSE, out.width="80%", fig.align="left"}
 knitr::include_graphics("static/fims-tmb2.png")
-```
----
-
-# Modular TMB structure: C++ code
-.pull-left[
-Common.hpp - setup TMB dependencies and define data types
-```{Rcpp, eval = FALSE}
-#include <TMB.hpp>
-using namespace tmbutils;
-using namespace density;
-//#include "tmbutils_extra.hpp"
-//#include <Rcpp.h>
-//using namespace Rcpp;
-
-template<typename Type>
-struct model_traits{
- typedef typename CppAD::vector<Type> data_vector;
- typedef data_indicator<tmbutils::vector<Type> , Type>  data_indicator;
- typedef typename tmbutils::array<Type> array;
-};
-```
-]
-.pull-right[
-```{Rcpp, eval = FALSE}
-#include "Common.hpp"
-template<class Type>
-class ar1xar1{
-  
-  using DataVector = typename model_traits<Type>::data_vector;
-  using DataIndicator = typename model_traits<Type>::data_indicator;
-  using ParameterArray = typename model_traits<Type>::array
-  
-  public:
-  DataVector  y;
-  DataIndicator keep;
-
-  ParameterArray eta;
-  Type phi1;
-  Type phi2;
-  static ar1xar1<Type>* instance;
-  
-  ar1xar1(){}
-  
-  static ar1xar1<Type>* getinstance(){
-    return ar1xar1<Type>::instance;
-  }
-  
-  ...
-```
-  ]
----
-# Modular TMB structure: C++ code
-.pull-left[
-Common.hpp - setup TMB dependencies and define data types
-```{Rcpp, eval = FALSE}
-#include <TMB.hpp>
-using namespace tmbutils;
-using namespace density;
-//#include "tmbutils_extra.hpp"
-//#include <Rcpp.h>
-//using namespace Rcpp;
-
-template<typename Type>
-struct model_traits{
- typedef typename CppAD::vector<Type> data_vector;
- typedef data_indicator<tmbutils::vector<Type> , Type>  data_indicator;
- typedef typename tmbutils::array<Type> array;
-};
-```
-]
-.pull-right[
-```{Rcpp, eval = FALSE}
-#include "Common.hpp"
-template<class Type>
-class ar1xar1{
-  ...
-  Type evaluate(){
-    Type nll = 0;
-    vector<Type> ln_lambda(y.size());
-    nll += SEPARABLE( AR1(phi2), AR1(phi1) )(eta);
-    for(int i=0; i < y.size(); i++){
-      nll -= keep[i] * dpois(y[i], exp(eta[i]), true);
-      Type cdf = squeeze( ppois(y[i], exp(eta[i])) );
-      nll -= keep.cdf_lower[i] * log( cdf );       // NaN protected
-      nll -= keep.cdf_upper[i] * log( 1.0 - cdf ); // NaN protected
-    }
-
-    return nll;
-  }
-
-};
-template<class Type>
-ar1xar1<Type>* ar1xar1<Type>::instance = new ar1xar1<Type>();
-```
-]
----
-# Modular TMB structure: TMB model
-```{Rcpp, eval = FALSE}
-template<class Type>
-Type objective_function<Type>::operator() ()
-{
-
-  ar1xar1<Type>* inst = ar1xar1<Type>::getinstance();
-  
-  DATA_VECTOR(y); 
-  DATA_VECTOR_INDICATOR(keep,y);
-  PARAMETER_ARRAY(eta);
-  PARAMETER(transf_phi1); Type phi1 = f(transf_phi1);
-  PARAMETER(transf_phi2); Type phi2 = f(transf_phi2);
-  
-  inst->y = y;
-  inst->keep = keep;
-  inst->phi1 = phi1;
-  inst->phi2 = phi2;
-  inst->eta = eta;
-  
-  Type nll = inst -> evaluate();
-
-  SIMULATE{
-    SEPARABLE(AR1(phi2), AR1(phi1)).simulate(eta);
-    vector<Type> ln_lambda = eta;//convert array to vector for rpois simulation
-    y = rpois(exp(ln_lambda));//rpois cannot accept array 
-    REPORT(eta);
-    REPORT(y);
-  }
-  ADREPORT(phi1);
-  ADREPORT(phi2);
-
-  return nll;
-}
 ```
